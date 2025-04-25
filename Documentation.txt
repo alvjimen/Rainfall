@@ -1,0 +1,26 @@
+Then, you will be able to log-in using the following couple of login:password:
+level0:level0
+  GCC stack protector support:            Enabled
+  Strict user copy checks:                Disabled
+  Restrict /dev/mem access:               Enabled
+  Restrict /dev/kmem access:              Enabled
+  grsecurity / PaX: No GRKERNSEC
+  Kernel Heap Hardening: No KERNHEAP
+ System-wide ASLR (kernel.randomize_va_space): Off (Setting: 0)
+RELRO           STACK CANARY      NX            PIE             RPATH      RUNPATH      FILE
+No RELRO        No canary found   NX enabled    No PIE          No RPATH   No RUNPATH   /home/user/level0/level0
+level0@RainFall:~$ ls -lhtr
+ls -lhtr
+total 732K
+-rwsr-x---+ 1 level1 users 730K Mar  6  2016 level0
+level0@RainFall:~$ file level0
+file level0
+level0: setuid ELF 32-bit LSB executable, Intel 80386, version 1 (GNU/Linux), statically linked, for GNU/Linux 2.6.24, BuildID[sha1]=0x85cf4024dbe79c7ccf4f30e7c601a356ce04f412, not stripped
+level0@RainFall:~$ strings ./level0 
+strings ./level0
+-bash: /usr/bin/strings: Input/output error
+target file -> $HOME/../level1/.pass
+level0@RainFall:~$ readelf -p .rodata ./level0  -> no relevant info for what i see.
+level0@RainFall:~$ ./level0 $HOME/../level1/.pass
+./level0 $HOME/../level1/.pass
+No !
