@@ -1,0 +1,23 @@
+#include <stdlib.h>
+
+int main(int  argc, char **argv)
+{
+  int  egid;
+  int euid;
+  char *execve_arr;
+  if (atoi(argv[1]) == 423)
+    {
+    execve_arr[0] = strdup("/bin/sh");
+    execve_arr[1] = NULL;
+    egid = getegid(); 
+    euid = geteuid(); 
+    setresgid(egid, egid, egid);
+    setresuid(euid,euid, euid);
+    execve("/bin/sh", execve_arr, NULL);
+    }
+  else
+    {
+      fwrite("No !\n", 1, 5, stdout);
+    }
+  return (0);
+}

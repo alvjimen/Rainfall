@@ -1,0 +1,23 @@
+#include <stdio.h>
+#include <stdlib.h>
+
+int p(void)
+{
+    unsigned int *ret_addr;      // Pointer to return address
+    char buffer[0x4c];           // 76-byte buffer
+
+    fflush(stdout);
+    gets(buffer);
+    ret_addr = *(unsigned int*)(__builtin_frame_address(0) + 4);
+    if ((ret_addr & 0xb0000000) == 0xb0000000) {
+        printf("(%p)\n", (void*)ret_addr);
+        _exit(1);
+    }
+    puts(buffer);
+    return (int)strdup(buffer);
+}
+
+int  main(void)
+{
+  return (p());
+}

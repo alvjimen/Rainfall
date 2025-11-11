@@ -1,0 +1,20 @@
+#+title:Techniques
+* Reversing Binary.
+** Suggested Software
+ghidra
+radare
+** Suggested Read
+[[https://ctf101.org/binary-exploitation/overview/][a handbook for the suggested test]]
+[[https://beta.hackndo.com/assembly-basics/][assembly]]
+[[https://beta.hackndo.com/stack-introduction/][Stack, Function call...]]
+~call = push eip, jmp~
+~ret = pop eip)~
+* Buffer Overflow.
+** Suggested Read:
+[[https://beta.hackndo.com/buffer-overflow/][buffer overflow]]
+[[https://beta.hackndo.com/retour-a-la-libc/][Silent mode Explotation]]
+https://owasp.org/www-community/attacks/Buffer_overflow_attack
+[[https://www.hackingarticles.in/linux-privilege-escalation-using-suid-binaries/]]
+* String format.
+https://owasp.org/www-community/attacks/Format_string_attack
+
