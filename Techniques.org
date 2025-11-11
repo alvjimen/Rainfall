@@ -17,4 +17,5 @@ https://owasp.org/www-community/attacks/Buffer_overflow_attack
 [[https://www.hackingarticles.in/linux-privilege-escalation-using-suid-binaries/]]
 * String format.
 https://owasp.org/www-community/attacks/Format_string_attack
+https://www.exploit-db.com/docs/english/28476-linux-format-string-exploitation.pdf
 

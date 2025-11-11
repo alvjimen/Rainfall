@@ -36,7 +36,7 @@ total 732K
     [     8]  /bin/sh #  Interesting string.
     [    10]  No !^J
 #+end_src
-** Got the asm of the code.
+* Got the asm of the code.
 #+begin_src shell :tangle no
 gdb -batch -ex 'file level0' -ex 'set disassembly-flavor intel' -ex 'disassemble main'
 Dump of assembler code for function main:
@@ -106,7 +106,7 @@ End of assembler dump.
   level0@RainFall:~$ ./level0 /home/user/level1/.pass
   No !
 #+end_src
-** Exploit  Executable
+* Exploit  Executable
 #+begin_src shell
   ./level0 423
 $ id

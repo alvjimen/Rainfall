@@ -1,38 +1,7 @@
-# Assembly
-## args
-_start
-32b   | 64b
-esp   | rsp == num args    -> argc
-[esp] | [rsp] == first arg -> argv[0]
-esp   | rsp == array args  -> argv.
-## stack
-A. Stack Frame  
-
-    The stack frame is a block of memory that holds:  
-        The function’s parameters.  
-        Local variables.  
-        Saved registers.  
-        The return address (so the function knows where to return).
-         
-    %ebp acts as a fixed reference point to access these values.
-     
-
-B. Accessing Parameters and Locals  
-
-    Using %ebp:  
-    Return address : [ebp + 4].  
-    First parameter : [ebp + 8] (assuming cdecl or similar calling convention).  
-    Saved registers : Located below %ebp (e.g., old %edi is at [ebp - 8]).  
-    Local variables : Allocated by subtracting from %esp (not shown here).
-
-
-# For binary explotation
-## detect the target binarie, perms ..
-## reverse
-## exploit
-level8@RainFall:~$ ls -lhtra
--rwsr-s---+ 1 level9 users  6.0K Mar  6  2016 level8
-# look for strings of the program
+#+title: walkthrough
+* For binary explotation
+** look for strings of the program
+#+begin_src shell
 level8@RainFall:~$ readelf -p .rodata level8
 String dump of section '.rodata':
   [     8]  %p, %p ^J   -> pointer, pointer
@@ -42,7 +11,11 @@ String dump of section '.rodata':
   [    25]  login
   [    2b]  /bin/sh     -> interesting path
   [    33]  Password:^J -> may ask for a password stdin ?
-# search for functions used in the binarie
+  
+#+end_src
+
+** search for functions used in the binarie
+#+begin_src shell
 gdb info functions 
 All defined functions:
 
@@ -57,7 +30,9 @@ Non-debugging symbols:
 0x08048470  malloc@plt -> interesting
 0x08048480  system@plt -> nice convination with /bin/sh
 0x08048564  main -> just this function
-# let's reverse this function
+#+end_src
+* Binary analysis
+#+begin_src shell
 (gdb) set disassembly-flavor intel
 (gdb) disass main
 Dump of assembler code for function main:
@@ -199,6 +174,7 @@ Dump of assembler code for function main:
    0x08048736 <+466>:	pop    edi
    0x08048737 <+467>:	pop    ebp
    0x08048738 <+468>:	ret
+#+end_src
 # Ejecucion
 (nil), (nil) 
 hola <- loop read from stdin until EOF (Ctrl + D)
@@ -208,14 +184,6 @@ hola <- loop read from stdin until EOF (Ctrl + D)
 __libc_start_main(0x8048564, 1, 0xbffffd14, 0x8048740, 0x80487b0 <unfinished ...>
 printf("%p, %p \n", (nil), (nil)#printf output kind of awful(nil), (nil)
 "fgets(hola\n", 128, 0xb7fd1ac0)                = 0xbffffbf0
-let's try the words appear on .rodata
-  [     8]  %p, %p ^J   -> # used
-  [    11]  auth        -> # global pointer malloc 4 bytes and strcpy heap-overflow
-  [    17]  reset       -> # free the malloc of auth
-  [    1d]  service     -> # strdup on other global pointer
-  [    25]  login       -> # ask for a Password don't clue how access the /bin/sh or system
-  [    2b]  /bin/sh     -> interesting path
-  [    33]  Password:^J -> may ask for a password stdin ?
   fgets(auth
 "auth\n", 128, 0xb7fd1ac0)                      = 0xbffffbf0
 fgets(auth 

