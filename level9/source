@@ -1,0 +1,47 @@
+class N {
+ private:
+  void *_vtable;
+  char _buffer[100];
+  int  _value;
+ public:
+
+  void setAnnotation(char* str) {
+    // Unsafe copy without length checking
+    size_t len = strlen(str);
+    memcpy(annotation, str, len);
+  }
+
+  N(int val) {
+   this->_vtable = 0x8048848;
+   this->_value = val;
+  }
+
+  int operator+(N& other) {
+    // Adds the value at offset 0x68 of both objects
+    return this->value + other.value;
+  }
+
+    // Overloaded - operator
+  int operator-(N& other) {
+    return this->value - other.value;
+  }
+  
+  void setAnnotation(char *str) {
+    size_t len = strlen(str);
+    strcpy(_buffer, str, len);
+  }
+};
+
+int main(int argc, char **argv, char **envp)
+{
+  if (argc == 1)
+    _exit(1);
+  N *a = new N(5);
+  N *b = new N(6);
+  void *c = *b;
+  b->setAnnotation(envp[1]);
+  c = *(int **)c;
+  c = *(int **)c;
+  c(b,a);
+  return ((int)b);
+}
