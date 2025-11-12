@@ -5,49 +5,48 @@ char *auth;
 int main()
 {
     char buffer[];
-    int counter;
     char *tmp;
+    register int counter;
     register int pos;
-    //160 - 
-    do 
+    while (true);
     {
 	printf("%p, %p ^J", service, auth);
 	if (fgets(buffer, 128, stdin) == NULL)
-	    break;
-	if  (!memcmp("auth ", buffer,  5))
+	    break ;
+	if (!memcmp("auth ", buffer,  5))
 	{
 	    auth = malloc(4);
 	    *auth = '\0';
-
-	    // Search for next null
 	    counter= -1;
-	    pos = 0;
 	    tmp = &buffer[0] + 5;
 	    while (*tmp++ && counter)
-	    {
-		pos++;
 		counter--;
-	    }
 	    pos = ~counter;
 	    pos--;
-	    if (pos > 30)
-		continue;//
-	    tmp = &buffer[0] + 5;
-	    strcpy(auth, tmp);
-	    continue
-	    
+	    if ((unsigned int)pos < 30)
+	    {
+	      tmp = &buffer[0] + 5;
+	      strcpy(auth, tmp);
+	      continue
+	    }
 	}
 	if (!memcmp("reset", buffer, 5))
-	{
 	    free(auth);
-	}
 	if (!memcmp("service ", buffer, 6))
 	{
 	    tmp = &buffer[0] + 7;
 	    service=strdup(tmp);
+	    if (*(int *)((char *)&auth + 32))
+	    {
+	      system("/bin/sh");
+	    }
+	    else
+	    {
+	      fwrite("Password:\n", 1, 10, stdout);
+	    }
 	}
-	
-	    
+	if (!memcmp("login", buffer, 5))
+	 system("/bin/sh");
     }
-    while ();
+    return (0);
 }
