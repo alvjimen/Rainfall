@@ -1,0 +1,11 @@
+class Agenda {
+ private:
+  char _buffer[20];
+ public:
+
+  Agenda();
+  void setAnnotation(char *str) {
+    size_t len = strlen(str);
+    strcpy(_buffer, str, len);
+  }
+};

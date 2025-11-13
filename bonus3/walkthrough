@@ -281,27 +281,8 @@ $5 = 0x804870a "/bin/sh"
 0x080485f3 <+255>:	mov    DWORD PTR [esp],0x804870a     -> '/bin/sh' param 1
 0x080485fa <+262>:	call   0x8048420 <execl@plt>         -> execl -> binsh
 0x080485ff <+267>:	jmp    0x8048610 <main+284>          -> return properly
-int main(int argc, char *argv[])
-{
-   FILE *fptr;             // fptr [esp + 0x9c]
-   char buffer[124] = {0}; // buffer [esp + 0x18]
 
-   fptr = fopen("/home/user/end/.pass", "r");
-   if (!fptr || argc != 2)
-      return (-1)
-   fread(buffer, 1, 66, fptr);
-   buffer[9] = '\0';
-   buffer[atoi(argv[1])] = '\0';
-   fread(buffer + 66, 1, 41, fptr);
-   fclose(fptr);
-   if (!strcmp(buffer, argv[1]))
-   {
-    puts(buffer + 42);
-    return (0);
-   }
-   execl('/bin/sh', 'sh', NULL);
-   return (0);
-}
+
 ## let's try to see the logic.
 # We open a file.
 ## check open correctly and argc == 2
