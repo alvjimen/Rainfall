@@ -109,7 +109,7 @@ atoi(0xbffffe1e, 0x8049764, 2, 0x80482fd, 0xb7fd13e4) = 0x80000000 -> expected r
 memcpy(0xbffffc24, NULL, 0)                           = 0xbffffc24
 +++ exited (status 0) +++b
 bonus1@RainFall:~$ echo "-2147483648 + 11" | bc
--2147483637
+-214748363
 bonus1@RainFall:~$ ltrace ./bonus1 -2147483637
 __libc_start_main(0x8048424, 2, 0xbffffcf4, 0x80484b0, 0x8048520 <unfinished ...>
 atoi(0xbffffe1e, 0x8049764, 2, 0x80482fd, 0xb7fd13e4) = 0x8000000b -> b = 11

