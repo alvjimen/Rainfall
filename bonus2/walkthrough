@@ -1,24 +1,24 @@
-# Access
+#+title: Walkthrough
+* Access
 bonus1@RainFall:~$ su bonus2
 Password: 579bd19263eb8655e4cf7b742d75edf8c38226925d78db8163506f5191825245
-# GATHER INFO
+* Data Gathering:
 # Analize the file
-## perm Sticky bit
 ls -lhtr 
 total 8.0K
 -rwsr-s---+ 1 bonus3 users 5.6K Mar  6  2016 bonus2
-### YES
-## any string
+## any string?
 bonus2@RainFall:~$ readelf -p .rodata
 bonus2@RainFall:~$
 ### look like no
 ## look for functions
+#+begin_src shell
 info functions @plt
 All functions matching regular expression "@plt":
 
 Non-debugging symbols:
 0x08048360  memcmp@plt -> overflow n -> is bigger than buffer size
-0x08048370  strcat@plt -> oveflow in not valid string -> strncpy
+0x08048370  strcat@plt -> overflow in not valid string -> strncpy
 0x08048380  getenv@plt -> env 
 0x08048390  puts@plt   -> print
 0x080483c0  strncpy@plt -> not null character in case str >= n
@@ -28,6 +28,8 @@ All defined functions:
 Non-debugging symbols:
 0x08048484  greetuser 
 0x08048529  main
+#+end_src
+
 ## look for the logic of the functions
 ### Remember
 rep stos is a repeating store  instruction:  
@@ -36,6 +38,7 @@ rep stos is a repeating store  instruction:
     edi is the destination address.  
     ecx (19) is the count of DWORDs (4 bytes each) to store.
      
+    #+begin_src shell
 (gdb) disass main
 Dump of assembler code for function main:
    0x08048529 <+0>:	push   ebp
@@ -109,6 +112,7 @@ Dump of assembler code for function main:
    0x08048636 <+269>:	pop    ebp
    0x08048637 <+270>:	ret    
 End of assembler dump.
+    #+end_src
 
 rep movs DWORD PTR es:[edi], DWORD PTR ds:[esi]    
 
@@ -117,35 +121,17 @@ rep movs DWORD PTR es:[edi], DWORD PTR ds:[esi]
         After each copy, both pointers (esi and edi) are incremented by 4 bytes  (since it’s a DWORD move).
          
     Result:  The memory block from [esp + 0x50] to [esp + 0x50 + 76] is copied to [esp] to [esp + 76].
-     
+#+begin_src shell
 p (char *)0x8048738
 $2 = 0x8048738 "LANG"
 p (char *)0x804873d
 $3 = 0x804873d "fi"
 p (char *)0x8048740
 $5 = 0x8048740 "nl"
+#+end_src
 # Code
-int main(int argc, char **argv)
-{
-    char buffer[76] = {0};
-    void *LANG_ENV;
-    
-    if (argc != 3)
-	   return 1;
-    strncpy(buffer, argv[1], 40);
-    strncpy(buffer + 40, argv[2], 32);
-    LANG_ENV = getenv("LANG");
-    if (LANG_ENV)
-    {
-        if (!memcmp(LANG_ENV, "fi", 2))
-           g_var = 1;
-        else if (!memcmp(LANG_ENV, "fi", 2))
-           g_var = 2;
-    }
-    memcpy(buffer, esp, 76);
-    greetuser(buffer);
-    return 0;
-}
+
+#+begin_src shell
 disass greetuser
 Dump of assembler code for function greetuser:
    0x08048484 <+0>:	push   ebp
@@ -209,7 +195,9 @@ $6 = 0x8048710 "Hello "
 $7 = 0x8048717 "Hyvää päivää "
 (gdb) p (char *)0x804872a
 $8 = 0x804872a "Goedemiddag! "
+#+end_src
 Flow Summary  
+
 
 The code generates a greeting message based on a global flag: 
 
@@ -218,65 +206,15 @@ The code generates a greeting message based on a global flag:
     Global Flag = 2 ('nl') :
     Jumps to a ... same as "hello " but in another language"
 
-    in any moment is set the var to 0 maybe i we don't want bleeding noises whe need to use 'fi' or 'nl'.
-    Global Flag = Non-zero (but not 1/2) :
     Skips the "Hello " setup and directly appends to an existing buffer (assumed initialized elsewhere). Weird may Sploitable
     Global Flag = 0 (default) :
     Constructs "Hello " in a buffer, appends another string (e.g., a name), and prints it.
-void greetuser(char *username)
-{
-    char buffer[72];
-
-    if (g_var == 1)
-       strcpy(buffer, "Hyvää päivää ");
-    else if (g_var == 2)
-       strcpy(buffer, "Goedemiddag! ");
-    else if (!g_var)
-       strcpy(buffer, "Hello ");
-    strcat(buffer, username);
-    puts(buffer);
-}
 
 # Code
 info var
 All defined variables:
 Non-debugging symbols:
 0x08049988  language -> is the oficial name of g_var
-int main(int argc, char **argv)
-{
-    char buffer[76] = {0};
-    void *LANG_ENV;
-    
-    if (argc != 3)
-	   return 1;
-    strncpy(buffer, argv[1], 40);
-    strncpy(buffer + 40, argv[2], 160); -> may overflow 2nd argv
-    LANG_ENV = getenv("LANG");
-    if (LANG_ENV)
-    {
-        if (!memcmp(LANG_ENV, "fi", 2))
-           language = 1;
-        else if (!memcmp(LANG_ENV, "fi", 2))
-           language = 2;
-    }
-    memcpy(buffer, esp, 76);
-    greetuser(buffer);
-    return 0;
-}
-
-void greetuser(char *username)
-{
-    char buffer[72];
-
-    if (language == 1)
-       strcpy(buffer, "Hyvää päivää ");
-    else if (language == 2)
-       strcpy(buffer, "Goedemiddag! ");
-    else if (!language)
-       strcpy(buffer, "Hello ");
-    strcat(buffer, username);
-    puts(buffer);
-}
 # launch for test what we see.
 bonus2@RainFall:~$ ltrace ./bonus2
 __libc_start_main(0x8048529, 1, 0xbffffd14, 0x8048640, 0x80486b0 <unfinished ...>

