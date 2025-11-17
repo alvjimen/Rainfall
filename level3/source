@@ -1,0 +1,19 @@
+int v(void)
+{
+  int result; // eax
+  char s[520]; // [esp+10h] [ebp-208h] BYREF
+  
+  fgets(s, 512, stdin);
+  printf(s);
+  result = m;
+  if (m != 64)
+      return (result);
+
+  fwrite("Wait what?!\n", 1u, 12, stdout);
+  return (system("/bin/sh"));
+}
+
+int main(void)
+{
+  return  (v());
+}

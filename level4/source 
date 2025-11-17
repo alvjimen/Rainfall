@@ -1,0 +1,25 @@
+#include <stdio.h>
+#include <stdlib.h>
+
+int p(char *fmt)
+{
+  return (printf(fmt));
+}
+
+int n()
+{
+  int result;
+  char s[520];
+
+  fgets(s, 512, stdin);
+  p(s);
+  result = m;
+  if (result = 16930116)
+    system("/bin/cat /home/user/level5/.pass");
+  return (result);
+}
+
+int main (void)
+{
+  return n();
+}
