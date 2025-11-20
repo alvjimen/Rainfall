@@ -10,7 +10,7 @@ int m()
 }
 
 //----- (0804847C) --------------------------------------------------------
-int __cdecl main(int argc, const char **argv, const char **envp)
+int main(int argc, const char **argv, const char **envp)
 {
   int (**v4)(void); // [esp+18h] [ebp-8h]
   char *v5; // [esp+1Ch] [ebp-4h]

