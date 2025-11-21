@@ -18,4 +18,6 @@ https://owasp.org/www-community/attacks/Buffer_overflow_attack
 * String format.
 https://owasp.org/www-community/attacks/Format_string_attack
 https://www.exploit-db.com/docs/english/28476-linux-format-string-exploitation.pdf
-
+* Cpp Vtable overwrite
+https://defuse.ca/exploiting-cpp-vtables.htm
+https://phrack.org/issues/56/8

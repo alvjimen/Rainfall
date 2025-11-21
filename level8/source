@@ -2,11 +2,11 @@
 
 char *service;
 char *auth;
+
 int main()
 {
-    char buffer[];
-    char *tmp;
-    register int counter;
+  
+    char buffer[136];
     register int pos;
     while (true);
     {
@@ -17,36 +17,21 @@ int main()
 	{
 	    auth = malloc(4);
 	    *auth = '\0';
-	    counter= -1;
-	    tmp = &buffer[0] + 5;
-	    while (*tmp++ && counter)
-		counter--;
-	    pos = ~counter;
-	    pos--;
-	    if ((unsigned int)pos < 30)
-	    {
-	      tmp = &buffer[0] + 5;
-	      strcpy(auth, tmp);
-	      continue
-	    }
+	    pos = strlen(buffer + 5);
+	    if ((unsigned int)pos <= 30)
+	      strcpy(auth, buffer + 5);
 	}
-	if (!memcmp("reset", buffer, 5))
+	else if (!memcmp("reset", buffer, 5))
 	    free(auth);
-	if (!memcmp("service ", buffer, 6))
-	{
-	    tmp = &buffer[0] + 7;
-	    service=strdup(tmp);
-	    if (*(int *)((char *)&auth + 32))
-	    {
-	      system("/bin/sh");
-	    }
-	    else
-	    {
-	      fwrite("Password:\n", 1, 10, stdout);
-	    }
+	else if (!memcmp("service", buffer, 6))# just cmp "servic"
+	    service=strdup(buffer + 7);
+	else if (!memcmp("login", buffer, 5))
+	{   
+	  if (*(int *)(&auth[32]))
+	    system("/bin/sh");
+	  else
+	    fwrite("Password:\n", 1, 10, stdout);
 	}
-	if (!memcmp("login", buffer, 5))
-	 system("/bin/sh");
     }
     return (0);
 }

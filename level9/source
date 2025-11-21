@@ -6,7 +6,7 @@ class N {
 
   void setAnnotation(char* str) {
     // Unsafe copy without length checking
-    size_t len = strlen(str);
+    register size_t len = strlen(str);
     memcpy(annotation, str, len);
   }
 
@@ -36,6 +36,6 @@ int main(int argc, char **argv, char **envp)
     _exit(1);
   N *a = new N(5);
   N *b = new N(6);
-  b->setAnnotation(envp[1]);
+  b->setAnnotation(argv[1]);
   return ((int)b+a);
 }

