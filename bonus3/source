@@ -13,10 +13,8 @@ int main(int argc, char *argv[])
    fread(buffer + 66, 1, 41, fptr);
    fclose(fptr);
    if (!strcmp(buffer, argv[1]))
-   {
-    puts(buffer + 42);
-    return (0);
-   }
-   execl('/bin/sh', 'sh', NULL);
+     execl('/bin/sh', 'sh', NULL);
+   else
+     puts(buffer + 42);
    return (0);
 }

